@@ -1,0 +1,12 @@
+from decimal import Decimal
+from typing import Optional
+from pydantic import BaseModel, Field
+class LoginIn(BaseModel): email:str; password:str
+class LeadCreate(BaseModel):
+    name:str=Field(min_length=1,max_length=255); address:str=''; postal_code:str=Field(pattern=r'^\d{5}$')
+    business_type:str=Field(min_length=1,max_length=100); business_subtype:str=Field(default='',max_length=150)
+    owner_name:str=Field(default='',max_length=150); phone:str=Field(default='',max_length=60); status:str='pending'
+class LeadPatch(BaseModel): status:Optional[str]=None; next_action:Optional[str]=None
+class ActivityCreate(BaseModel): activity_type:str; notes:str=''
+class SaleCreate(BaseModel):
+    lead_id:int; quantity:int=Field(ge=1,le=1000); unit_price:Decimal=Field(gt=0,le=100000); payment_method:str='cash'; delivered:bool=True
