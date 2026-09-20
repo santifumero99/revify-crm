@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .db import Base, engine, SessionLocal, User, Lead, Activity, Sale, AuditLog, IdempotencyKey, utcnow
 from .auth import hash_password, verify_password, sign_token, get_db, current_user
 from .schemas import LoginIn, LeadCreate, LeadPatch, ActivityCreate, SaleCreate
+from .admin import router as admin_router
 
 APP_ENV=os.getenv('APP_ENV','development'); SEED=os.getenv('SEED_DEMO_LEAD','true').lower()=='true'
 VALID_STATUSES={'pending','owner_absent','closed','follow_up','won','lost'}
@@ -29,6 +30,7 @@ def decode_cursor(c:str):
     except Exception: raise HTTPException(400,'Cursor no válido')
 
 app=FastAPI(title='Revify CRM',version='1.0.0')
+app.include_router(admin_router)
 @app.on_event('startup')
 def startup():
     Base.metadata.create_all(engine)
