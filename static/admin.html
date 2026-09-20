@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Revify Admin</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <div id="loginView" class="login-shell">
+    <form class="login-card" onsubmit="adminLogin(event)">
+      <div class="brand"><div class="logo">R</div><div><strong>Revify</strong><span>Admin</span></div></div>
+      <h1>Panel de administración</h1>
+      <p>Control de comerciales, negocios y ventas en tiempo real.</p>
+      <label>Email</label>
+      <input id="adminEmail" type="email" autocomplete="username" required>
+      <label>Contraseña</label>
+      <input id="adminPassword" type="password" autocomplete="current-password" required>
+      <button type="submit">Entrar al panel</button>
+      <div id="loginError" class="error"></div>
+    </form>
+  </div>
+
+  <div id="adminView" class="app hidden">
+    <aside>
+      <div class="side-brand"><div class="logo">R</div><strong>Revify</strong><span>Admin</span></div>
+      <nav>
+        <button class="nav active" data-tab="dashboard" onclick="showTab('dashboard')">◫ Dashboard</button>
+        <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
+        <button class="nav" data-tab="leads" onclick="showTab('leads')">▣ Negocios</button>
+        <button class="nav" data-tab="security" onclick="showTab('security')">⚙ Seguridad</button>
+      </nav>
+      <div class="side-bottom">
+        <small id="adminIdentity"></small>
+        <button onclick="adminLogout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Visión global de Revify</p></div>
+        <button class="primary" onclick="openCreateCommercial()">＋ Nuevo comercial</button>
+      </header>
+
+      <section id="tab-dashboard" class="tab">
+        <div class="kpis">
+          <article><span>Negocios</span><b id="kLeads">0</b><small>registrados</small></article>
+          <article><span>Ventas hoy</span><b id="kSalesToday">0</b><small id="kRevenueToday">0 €</small></article>
+          <article><span>Conversión</span><b id="kConversion">0%</b><small>vendidos / negocios</small></article>
+          <article><span>Comerciales activos</span><b id="kUsers">0</b><small>usuarios con acceso</small></article>
+        </div>
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Actividad de hoy</h2><p>Lo que está pasando en la calle</p></div></div>
+            <div class="activity-grid">
+              <div><span>Visitas</span><b id="kVisits">0</b></div>
+              <div><span>Demos</span><b id="kDemos">0</b></div>
+              <div><span>Ventas</span><b id="kSalesToday2">0</b></div>
+              <div><span>Facturación</span><b id="kRevenueToday2">0 €</b></div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Acumulado</h2><p>Desde el inicio</p></div></div>
+            <div class="activity-grid">
+              <div><span>Ventas</span><b id="kSalesTotal">0</b></div>
+              <div><span>Facturación</span><b id="kRevenueTotal">0 €</b></div>
+              <div><span>Vendidos</span><b id="kWon">0</b></div>
+              <div><span>Negocios</span><b id="kLeads2">0</b></div>
+            </div>
+          </section>
+        </div>
+        <div class="two-col">
+          <section class="panel"><div class="panel-head"><div><h2>Códigos postales</h2><p>Zonas con más actividad</p></div></div><div id="postalList" class="bars"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>Categorías</h2><p>Mix de cartera</p></div></div><div id="categoryList" class="bars"></div></section>
+        </div>
+        <section class="panel">
+          <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Datos alimentados por cada CRM</p></div><button class="link" onclick="showTab('team')">Gestionar equipo</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Comercial</th><th>Leads</th><th>Visitas</th><th>Ventas</th><th>Conversión</th><th>Facturación</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
+        </section>
+      </section>
+
+      <section id="tab-team" class="tab hidden">
+        <section class="panel">
+          <div class="panel-head"><div><h2>Accesos del equipo</h2><p>Crea comerciales, pausa accesos y restablece contraseñas.</p></div><button class="primary small" onclick="openCreateCommercial()">＋ Nuevo comercial</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Ventas</th><th>Facturación</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
+        </section>
+        <div id="credentialBox" class="credential hidden"></div>
+      </section>
+
+      <section id="tab-leads" class="tab hidden">
+        <section class="panel">
+          <div class="panel-head"><div><h2>Todos los negocios</h2><p>Se actualiza con lo que registran los comerciales.</p></div></div>
+          <div class="filters">
+            <input id="fSearch" placeholder="Buscar negocio, dirección, contacto..." oninput="debouncedAdminLeads()">
+            <input id="fPostal" maxlength="5" placeholder="Código postal" oninput="debouncedAdminLeads()">
+            <select id="fRep" onchange="loadAdminLeads(true)"><option value="">Todos los comerciales</option></select>
+            <select id="fStatus" onchange="loadAdminLeads(true)">
+              <option value="">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="owner_absent">No está el dueño</option>
+              <option value="closed">Local cerrado</option>
+              <option value="follow_up">Seguimiento</option>
+              <option value="won">Vendido</option>
+              <option value="lost">No interesado</option>
+            </select>
+            <select id="fCategory" onchange="loadAdminLeads(true)">
+              <option value="">Todas las categorías</option>
+              <option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option>
+              <option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option>
+              <option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option>
+            </select>
+          </div>
+          <div id="adminLeadList" class="lead-cards"></div>
+          <button id="adminLoadMore" class="load-more hidden" onclick="loadAdminLeads(false)">Cargar 50 más</button>
+        </section>
+      </section>
+
+      <section id="tab-security" class="tab hidden">
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Cambiar mi contraseña</h2><p>La contraseña se guarda cifrada en la base de datos.</p></div></div>
+            <form class="stack" onsubmit="changeMyPassword(event)">
+              <label>Contraseña actual</label><input id="currentPass" type="password" required>
+              <label>Nueva contraseña</label><input id="newPass" type="password" minlength="10" required>
+              <label>Repite la nueva contraseña</label><input id="newPass2" type="password" minlength="10" required>
+              <button class="primary" type="submit">Cambiar contraseña</button>
+              <div id="passwordMsg" class="form-msg"></div>
+            </form>
+          </section>
+          <section class="panel info-panel">
+            <h2>Acceso de comerciales</h2>
+            <p>Desde <b>Comerciales → Nuevo comercial</b> creas un email y una contraseña temporal. El comercial entra en la misma URL del CRM y solo ve sus propios negocios y actividad.</p>
+            <p>El panel de administración usa la misma base de datos, así que visitas, ventas y nuevos leads aparecen aquí automáticamente.</p>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="commercialModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head"><div><h2>Nuevo comercial</h2><p>Crea sus credenciales de acceso al CRM.</p></div><button onclick="closeCreateCommercial()">✕</button></div>
+      <form onsubmit="createCommercial(event)" class="stack">
+        <label>Email</label><input id="commercialEmail" type="email" required>
+        <label>Contraseña temporal</label>
+        <div class="password-row"><input id="commercialPassword" type="text" minlength="10" required><button type="button" onclick="generateCommercialPassword()">Generar</button></div>
+        <small>Guárdala o cópiala ahora. Revify no almacena contraseñas en texto plano.</small>
+        <button class="primary" type="submit">Crear acceso</button>
+        <div id="createCommercialMsg" class="form-msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/admin.js"></script>
+</body>
+</html>
