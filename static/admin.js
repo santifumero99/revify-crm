@@ -100,7 +100,7 @@ async function loadReps(){
   document.getElementById('teamTable').innerHTML=reps.map(function(r){
     let buttons='';
     if(r.role!=='admin'){
-      buttons='<button onclick="resetRepPassword('+r.id+',\\''+esc(r.email)+'\\')">Contraseña</button><button class="'+(r.is_active?'danger':'')+'" onclick="toggleRep('+r.id+','+(!r.is_active)+')">'+(r.is_active?'Pausar':'Activar')+'</button>';
+      buttons='<button data-email="'+esc(r.email)+'" onclick="resetRepPassword('+r.id+',this.dataset.email)">Contraseña</button><button class="'+(r.is_active?'danger':'')+'" onclick="toggleRep('+r.id+','+(!r.is_active)+')">'+(r.is_active?'Pausar':'Activar')+'</button>';
     }
     return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+r.leads+'</td><td>'+r.sales+'</td><td>'+money(r.revenue)+'</td><td><div class="actions">'+buttons+'</div></td></tr>';
   }).join('');
