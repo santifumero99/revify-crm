@@ -11,11 +11,9 @@
     <form class="login-card" onsubmit="adminLogin(event)">
       <div class="brand"><div class="logo">R</div><div><strong>Revify</strong><span>Admin</span></div></div>
       <h1>Panel de administración</h1>
-      <p>Control de comerciales, negocios y ventas en tiempo real.</p>
-      <label>Email</label>
-      <input id="adminEmail" type="email" autocomplete="username" required>
-      <label>Contraseña</label>
-      <input id="adminPassword" type="password" autocomplete="current-password" required>
+      <p>Control central de comerciales, negocios, actividad y facturación.</p>
+      <label>Email</label><input id="adminEmail" type="email" autocomplete="username" required>
+      <label>Contraseña</label><input id="adminPassword" type="password" autocomplete="current-password" required>
       <button type="submit">Entrar al panel</button>
       <div id="loginError" class="error"></div>
     </form>
@@ -26,99 +24,123 @@
       <div class="side-brand"><div class="logo">R</div><strong>Revify</strong><span>Admin</span></div>
       <nav>
         <button class="nav active" data-tab="dashboard" onclick="showTab('dashboard')">◫ Dashboard</button>
+        <button class="nav" data-tab="postal" onclick="showTab('postal')">⌖ Códigos postales</button>
+        <button class="nav" data-tab="categories" onclick="showTab('categories')">◇ Categorías</button>
         <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
         <button class="nav" data-tab="leads" onclick="showTab('leads')">▣ Negocios</button>
+        <button class="nav" data-tab="activity" onclick="showTab('activity')">↻ Actividad</button>
         <button class="nav" data-tab="security" onclick="showTab('security')">⚙ Seguridad</button>
       </nav>
-      <div class="side-bottom">
-        <small id="adminIdentity"></small>
-        <button onclick="adminLogout()">Cerrar sesión</button>
-      </div>
+      <div class="side-bottom"><small id="adminIdentity"></small><button onclick="adminLogout()">Cerrar sesión</button></div>
     </aside>
 
     <main>
       <header>
         <div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Visión global de Revify</p></div>
-        <button class="primary" onclick="openCreateCommercial()">＋ Nuevo comercial</button>
+        <div class="header-actions">
+          <select id="periodSelect" onchange="loadAnalytics()">
+            <option value="1">Hoy</option>
+            <option value="7">Últimos 7 días</option>
+            <option value="30" selected>Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+            <option value="0">Todo el histórico</option>
+          </select>
+          <button class="primary" onclick="openCreateCommercial()">＋ Nuevo comercial</button>
+        </div>
       </header>
 
       <section id="tab-dashboard" class="tab">
-        <div class="kpis">
-          <article><span>Negocios</span><b id="kLeads">0</b><small>registrados</small></article>
-          <article><span>Ventas hoy</span><b id="kSalesToday">0</b><small id="kRevenueToday">0 €</small></article>
-          <article><span>Conversión</span><b id="kConversion">0%</b><small>vendidos / negocios</small></article>
-          <article><span>Comerciales activos</span><b id="kUsers">0</b><small>usuarios con acceso</small></article>
+        <div class="kpis eight">
+          <article><span>Negocios totales</span><b id="kLeads">0</b><small id="kNewLeads">0 nuevos en periodo</small></article>
+          <article><span>Facturación</span><b id="kRevenue">0 €</b><small id="kUnits">0 NFC vendidos</small></article>
+          <article><span>Ventas</span><b id="kSales">0</b><small id="kAvgTicket">Ticket medio 0 €</small></article>
+          <article><span>Conversión cartera</span><b id="kPortfolioConversion">0%</b><small>Vendidos / negocios</small></article>
+          <article><span>Visitas</span><b id="kVisits">0</b><small id="kSalePerVisit">0% venta / visita</small></article>
+          <article><span>Demos</span><b id="kDemos">0</b><small id="kFollowups">0 seguimientos</small></article>
+          <article><span>Facturación / visita</span><b id="kRevenuePerVisit">0 €</b><small>Eficiencia comercial</small></article>
+          <article><span>Usuarios activos</span><b id="kUsers">0</b><small>Admin + comerciales</small></article>
         </div>
+
         <div class="two-col">
           <section class="panel">
-            <div class="panel-head"><div><h2>Actividad de hoy</h2><p>Lo que está pasando en la calle</p></div></div>
-            <div class="activity-grid">
-              <div><span>Visitas</span><b id="kVisits">0</b></div>
-              <div><span>Demos</span><b id="kDemos">0</b></div>
-              <div><span>Ventas</span><b id="kSalesToday2">0</b></div>
-              <div><span>Facturación</span><b id="kRevenueToday2">0 €</b></div>
-            </div>
+            <div class="panel-head"><div><h2>Embudo actual</h2><p>Distribución de todos los negocios por estado</p></div></div>
+            <div id="statusFunnel" class="funnel"></div>
           </section>
           <section class="panel">
-            <div class="panel-head"><div><h2>Acumulado</h2><p>Desde el inicio</p></div></div>
-            <div class="activity-grid">
-              <div><span>Ventas</span><b id="kSalesTotal">0</b></div>
-              <div><span>Facturación</span><b id="kRevenueTotal">0 €</b></div>
-              <div><span>Vendidos</span><b id="kWon">0</b></div>
-              <div><span>Negocios</span><b id="kLeads2">0</b></div>
-            </div>
+            <div class="panel-head"><div><h2>Tendencia diaria</h2><p>Últimos días: leads, visitas, ventas y facturación</p></div></div>
+            <div id="dailyTrend" class="daily-trend"></div>
           </section>
         </div>
-        <div class="two-col">
-          <section class="panel"><div class="panel-head"><div><h2>Códigos postales</h2><p>Zonas con más actividad</p></div></div><div id="postalList" class="bars"></div></section>
-          <section class="panel"><div class="panel-head"><div><h2>Categorías</h2><p>Mix de cartera</p></div></div><div id="categoryList" class="bars"></div></section>
-        </div>
+
         <section class="panel">
-          <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Datos alimentados por cada CRM</p></div><button class="link" onclick="showTab('team')">Gestionar equipo</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Comercial</th><th>Leads</th><th>Visitas</th><th>Ventas</th><th>Conversión</th><th>Facturación</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
+          <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Actividad y resultado del periodo seleccionado</p></div><button class="link" onclick="showTab('team')">Ver equipo completo</button></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Comercial</th><th>Leads</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket</th><th>Facturación</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
+        </section>
+
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Top códigos postales</h2><p>Ordenados por facturación del periodo</p></div><button class="link" onclick="showTab('postal')">Ver todos</button></div>
+            <div id="postalTop" class="mini-ranking"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Top categorías</h2><p>Qué tipo de comercio está generando más</p></div><button class="link" onclick="showTab('categories')">Ver todas</button></div>
+            <div id="categoryTop" class="mini-ranking"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="tab-postal" class="tab hidden">
+        <section class="panel">
+          <div class="panel-head"><div><h2>Rendimiento por código postal</h2><p>Penetración, actividad, conversión y facturación zona por zona.</p></div><input id="postalSearch" class="small-search" placeholder="Buscar CP..." oninput="renderPostalTable()"></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>CP</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="postalTable"></tbody></table></div>
+        </section>
+      </section>
+
+      <section id="tab-categories" class="tab hidden">
+        <section class="panel">
+          <div class="panel-head"><div><h2>Rendimiento por categoría</h2><p>Qué verticales convierten y facturan mejor.</p></div><input id="categorySearch" class="small-search" placeholder="Buscar categoría..." oninput="renderCategoryTable()"></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Categoría</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="categoryTable"></tbody></table></div>
         </section>
       </section>
 
       <section id="tab-team" class="tab hidden">
         <section class="panel">
-          <div class="panel-head"><div><h2>Accesos del equipo</h2><p>Crea comerciales, pausa accesos y restablece contraseñas.</p></div><button class="primary small" onclick="openCreateCommercial()">＋ Nuevo comercial</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Ventas</th><th>Facturación</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
+          <div class="panel-head"><div><h2>Rendimiento y accesos</h2><p>Un CRM por usuario, una única base de datos para dirección.</p></div><button class="primary small" onclick="openCreateCommercial()">＋ Nuevo comercial</button></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Ticket</th><th>Facturación</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
         </section>
         <div id="credentialBox" class="credential hidden"></div>
       </section>
 
       <section id="tab-leads" class="tab hidden">
         <section class="panel">
-          <div class="panel-head"><div><h2>Todos los negocios</h2><p>Se actualiza con lo que registran los comerciales.</p></div></div>
+          <div class="panel-head"><div><h2>Detalle de todos los negocios</h2><p id="leadCountLabel">Cartera completa del equipo.</p></div></div>
           <div class="filters">
             <input id="fSearch" placeholder="Buscar negocio, dirección, contacto..." oninput="debouncedAdminLeads()">
             <input id="fPostal" maxlength="5" placeholder="Código postal" oninput="debouncedAdminLeads()">
             <select id="fRep" onchange="loadAdminLeads(true)"><option value="">Todos los comerciales</option></select>
             <select id="fStatus" onchange="loadAdminLeads(true)">
-              <option value="">Todos los estados</option>
-              <option value="pending">Pendiente</option>
-              <option value="owner_absent">No está el dueño</option>
-              <option value="closed">Local cerrado</option>
-              <option value="follow_up">Seguimiento</option>
-              <option value="won">Vendido</option>
-              <option value="lost">No interesado</option>
+              <option value="">Todos los estados</option><option value="pending">Pendiente</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="won">Vendido</option><option value="lost">No interesado</option>
             </select>
             <select id="fCategory" onchange="loadAdminLeads(true)">
-              <option value="">Todas las categorías</option>
-              <option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option>
-              <option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option>
-              <option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option>
+              <option value="">Todas las categorías</option><option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option><option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option><option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option>
             </select>
           </div>
-          <div id="adminLeadList" class="lead-cards"></div>
+          <div class="table-wrap"><table class="ultra-wide"><thead><tr><th>Negocio</th><th>CP</th><th>Categoría / tipo</th><th>Comercial</th><th>Estado</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Ticket</th><th>Facturación</th><th>Contacto</th><th>Próxima acción</th><th>Actualizado</th></tr></thead><tbody id="businessTable"></tbody></table></div>
           <button id="adminLoadMore" class="load-more hidden" onclick="loadAdminLeads(false)">Cargar 50 más</button>
+        </section>
+      </section>
+
+      <section id="tab-activity" class="tab hidden">
+        <section class="panel">
+          <div class="panel-head"><div><h2>Última actividad</h2><p>Rastro de cambios generado por el equipo.</p></div></div>
+          <div id="activityFeed" class="activity-feed"></div>
         </section>
       </section>
 
       <section id="tab-security" class="tab hidden">
         <div class="two-col">
           <section class="panel">
-            <div class="panel-head"><div><h2>Cambiar mi contraseña</h2><p>La contraseña se guarda cifrada en la base de datos.</p></div></div>
+            <div class="panel-head"><div><h2>Cambiar mi contraseña</h2><p>La contraseña se guarda cifrada en PostgreSQL.</p></div></div>
             <form class="stack" onsubmit="changeMyPassword(event)">
               <label>Contraseña actual</label><input id="currentPass" type="password" required>
               <label>Nueva contraseña</label><input id="newPass" type="password" minlength="10" required>
@@ -128,9 +150,9 @@
             </form>
           </section>
           <section class="panel info-panel">
-            <h2>Acceso de comerciales</h2>
-            <p>Desde <b>Comerciales → Nuevo comercial</b> creas un email y una contraseña temporal. El comercial entra en la misma URL del CRM y solo ve sus propios negocios y actividad.</p>
-            <p>El panel de administración usa la misma base de datos, así que visitas, ventas y nuevos leads aparecen aquí automáticamente.</p>
+            <h2>Cómo funciona el dato</h2>
+            <p>Cada comercial inicia sesión con su propio usuario. Los leads, visitas, demos, estados y ventas que registra se guardan en la base de datos central.</p>
+            <p>El Admin agrega esa información por <b>código postal, categoría, negocio y comercial</b>. La facturación que ves aquí proviene de las ventas realmente registradas en el CRM.</p>
           </section>
         </div>
       </section>
