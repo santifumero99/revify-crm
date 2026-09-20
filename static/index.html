@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Revify CRM V8.1</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="phone">
+    <section class="screen" id="screen-login">
+      <div class="login-wrap">
+        <form class="login-card" onsubmit="login(event)">
+          <div class="login-brand"><div class="logo">R</div><b>Revify</b></div>
+          <h2>Acceso comercial</h2>
+          <p>Entra con tu usuario de Revify.</p>
+          <label>EMAIL</label>
+          <input id="loginEmail" type="email" autocomplete="username" required>
+          <label>CONTRASEÑA</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required>
+          <button type="submit">Entrar</button>
+          <div class="login-error" id="loginError"></div>
+        </form>
+      </div>
+    </section>
+    <section class="screen" id="screen-home">
+      <div class="hero">
+        <div class="statusbar"><span>9:41</span><span>◖◗ ▂▃▅</span></div>
+        <div class="brandrow"><div class="brand"><div class="logo">R</div><h1>Revify</h1></div><button class="bell">🔔</button></div>
+        <div class="greeting"><div><h2>¡Hola, Alex!</h2><p>A seguir creando oportunidades 🚀</p></div><div class="date">Vie, 16 May</div></div>
+      </div>
+      <div class="content">
+        <div class="grid">
+          <div class="card metric"><div class="top"><span>Visitas</span><div class="mini-icon">👥</div></div><div><div class="value" id="dash-visits">0</div><div class="trend" id="visits-note">Hoy</div></div></div>
+          <div class="card metric"><div class="top"><span>Demos</span><div class="mini-icon">📈</div></div><div><div class="value" id="dash-demos">0</div><div class="trend" id="demos-note">Hoy</div></div></div>
+          <div class="card metric"><div class="top"><span>Ventas</span><div class="mini-icon">🛒</div></div><div><div class="value" id="dash-sales">0</div><div class="trend" id="sales-note">Hoy</div></div></div>
+          <div class="card metric"><div class="top"><span>Facturación</span><div class="mini-icon">💶</div></div><div><div class="value" id="dash-revenue">€0</div><div class="trend" id="revenue-note">Hoy</div></div></div>
+        </div>
+        <div class="card progress-card"><h3>Tu progreso hoy</h3><div class="progress-body"><div class="ring" id="ring" style="--val:0"><div class="inside"><b id="ring-pct">0%</b></div></div><div class="progress-copy"><b id="progress-text">0 de 10 ventas</b><span>Objetivo diario</span></div></div></div>
+        <div class="banner"><b>“Más reseñas.<br>Más negocios.”</b><div class="brand2">R <span>Revify</span></div></div>
+        <div class="section"><div class="section-head"><div><h4>Qué trabajar ahora</h4><small>La oportunidad prioritaria del momento</small></div><button class="linkbtn" onclick="showLeads()">Ver cartera</button></div><div class="card"><div class="work-card"><div class="biz-avatar" id="priority-avatar">F</div><div><h5 id="priority-name">Ferretería Demo</h5><p id="priority-address">Cargando…</p><span class="badge" id="priority-status">Pendiente</span></div><div style="font-size:22px;color:#7b8aa2">›</div></div><div class="work-actions"><button class="ghostbtn">Ir</button><button class="softbtn" onclick="priorityLead&&openLead(priorityLead.id)">Registrar</button><button class="primarybtn" onclick="sellPriorityLead()">Vender</button></div></div></div>
+      </div>
+    </section>
+    <section class="screen" id="screen-sale"><div class="sheet sale-page"><div class="sale-top"><button class="back" onclick="showHome()">‹</button><h2>Registrar venta</h2><button class="close" onclick="showHome()">✕</button></div><div class="sale-biz"><div class="thumb" id="sale-avatar">—</div><div><b id="sale-name">Selecciona un lead</b><small id="sale-address">Abre un lead y pulsa Vender</small></div></div><div class="sale-grid"><div><div class="label">Cantidad de NFC</div><div class="stepper"><button onclick="changeQty(-1)">−</button><div id="qty">1</div><button style="color:#1974ff" onclick="changeQty(1)">+</button></div></div><div class="field"><div class="label">Precio unitario</div><input id="price" class="price" type="number" step="0.01" value="25.00" oninput="calc()"></div></div><div class="total-box"><span>Total</span><b id="total">€25,00</b></div><div class="seg-group"><div class="seg-title">Método de pago</div><div class="seg3"><button class="seg selected" data-pay="cash" onclick="selectPay(this)"><span class="check">✓</span>Efectivo</button><button class="seg" data-pay="card" onclick="selectPay(this)"><span class="check"></span>Tarjeta</button><button class="seg" data-pay="bizum" onclick="selectPay(this)"><span class="check"></span>Bizum</button></div></div><div class="money-grid"><div class="field"><div class="label">Cobrado</div><input id="collected" class="price" value="25.00"></div><div class="field"><div class="label">Estado del lead</div><input value="Vendido" disabled style="color:#12b76a"></div></div><div class="helper">Base Revify: 25 € por NFC. El comercial puede modificar el precio si lo necesita.</div><div class="seg-group"><div class="seg-title">¿Entregado hoy?</div><div class="seg2"><button class="seg selected" onclick="selectDelivery(this)"><span class="check">✓</span>Sí, entregado</button><button class="seg" onclick="selectDelivery(this)"><span class="check"></span>Pendiente de entregar</button></div></div><button class="full-primary" onclick="finishSale()">Registrar venta</button></div></section>
+    <section class="screen" id="screen-leads"><main class="subscreen"><div class="page-head"><div><h2>Leads</h2><p>Negocios dados de alta por el comercial</p></div><button class="head-cta" onclick="showCreate()">＋ Dar de alta</button></div><input id="leadSearch" class="lead-search" placeholder="Buscar negocio, categoría, tipo, CP o contacto" oninput="handleLeadSearch()" /><div class="lead-summary"><div class="sum"><span>Total</span><b id="sumTotal">0</b></div><div class="sum"><span>Pendientes</span><b id="sumPending">0</b></div><div class="sum"><span>Seguimiento</span><b id="sumFollow">0</b></div><div class="sum"><span>Vendidos</span><b id="sumWon">0</b></div></div><div class="lead-list" id="leadList"></div><button id="loadMoreLeads" class="head-cta" style="display:none;width:100%;margin-top:8px;background:rgba(255,255,255,.10)" onclick="loadMoreLeads()">Cargar 50 más</button></main></section>
+    <section class="screen" id="screen-create"><main class="subscreen"><div class="page-head"><div><h2>Dar de alta negocio</h2><p>Crear un nuevo lead en tu cartera · CP y categoría obligatorios</p></div><button class="head-cta" style="background:rgba(255,255,255,.10)" onclick="showLeads()">Cancelar</button></div><form class="create-card" onsubmit="saveLead(event)"><div class="create-grid"><div class="create-field full"><label>NOMBRE DEL NEGOCIO *</label><input id="newName" required placeholder="Ej. Barbería Juan"></div><div class="create-field full"><label>DIRECCIÓN</label><input id="newAddress" placeholder="Calle y número"></div><div class="create-field"><label>CÓDIGO POSTAL *</label><input id="newPostalCode" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" placeholder="08006"></div><div class="create-field"><label>CATEGORÍA *</label><select id="newBusinessType" required><option value="">Selecciona categoría</option><option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option><option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option><option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option></select></div><div class="create-field"><label>TIPO CONCRETO <span style="opacity:.6">(opcional)</span></label><input id="newBusinessSubtype" placeholder="Ej. ferretería, bazar, barbería..."><small style="display:block;margin-top:5px;color:#9fb0c8;font-size:9px">Escribe qué negocio es exactamente.</small></div><div class="create-field"><label>CONTACTO / DUEÑO</label><input id="newOwner" placeholder="Nombre"></div><div class="create-field"><label>TELÉFONO</label><input id="newPhone" inputmode="tel" placeholder="600 000 000"></div><div class="create-field full"><label>ESTADO INICIAL</label><select id="newStatus"><option value="pending">Pendiente</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="won">Vendido</option><option value="lost">No interesado</option></select></div></div><button class="save-lead">Guardar lead</button></form></main></section>
+    <section class="screen" id="screen-lead-detail"><main class="subscreen"><div class="page-head"><div><h2>Ficha del negocio</h2><p>Estado, contacto y siguiente acción</p></div><button class="head-cta" style="background:rgba(255,255,255,.10)" onclick="showLeads()">Volver</button></div><div id="leadDetail"></div></main></section>
+    <section class="screen" id="screen-more"><div class="sheet"><div class="sale-top"><button class="back" onclick="showHome()">‹</button><h2>Más</h2><span style="width:30px"></span></div><div class="more-section"><div class="more-list"><button class="more-row danger" onclick="confirmLogout()"><span class="more-ico">↪</span><span class="more-copy"><b>Cerrar sesión</b><small>Salir de Revify en este dispositivo</small></span><span>›</span></button></div></div></div></section>
+    <nav class="navbar"><button class="navbtn active" data-nav="home" onclick="showHome()"><span class="ico">⌂</span>Inicio</button><button class="navbtn" data-nav="leads" onclick="showLeads()"><span class="ico">▣</span>Leads</button><button class="navbtn addlead" data-nav="create" onclick="showCreate()"><span class="ico">＋</span>Alta</button><button class="navbtn" data-nav="sale" onclick="showSale()"><span class="ico">🛒</span>Ventas</button><button class="navbtn" data-nav="more" onclick="showMore()"><span class="ico">⋯</span>Más</button></nav>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
