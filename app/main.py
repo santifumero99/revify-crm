@@ -295,6 +295,24 @@ def patch_lead(lead_id:int,data:LeadPatch,user:User=Depends(current_user),db:Ses
         response['sale']=sale_out(sale_created,x)
     return response
 
+@app.get('/api/leads/{lead_id}/activities')
+def list_activities(lead_id:int,limit:int=Query(20,ge=1,le=100),user:User=Depends(current_user),db:Session=Depends(get_db)):
+    x=db.get(Lead,lead_id)
+    if not x or x.assigned_user_id!=user.id:
+        raise HTTPException(404,'Lead no encontrado')
+    rows=list(db.scalars(
+        select(Activity)
+        .where(Activity.lead_id==x.id,Activity.actor_user_id==user.id)
+        .order_by(Activity.created_at.desc(),Activity.id.desc())
+        .limit(limit)
+    ).all())
+    return {'items':[{
+        'id':a.id,
+        'activity_type':a.activity_type,
+        'notes':a.notes or '',
+        'created_at':a.created_at.isoformat()
+    } for a in rows]}
+
 @app.post('/api/leads/{lead_id}/activities')
 def add_activity(lead_id:int,data:ActivityCreate,user:User=Depends(current_user),db:Session=Depends(get_db)):
     x=db.get(Lead,lead_id)
