@@ -89,14 +89,20 @@ def startup():
                 pass
     email=os.getenv('REVIFY_USER_EMAIL','demo@revify.local')
     password=os.getenv('REVIFY_USER_PASSWORD','demo')
+    force_password_sync=os.getenv('REVIFY_FORCE_PASSWORD_SYNC','false').strip().lower()=='true'
     if APP_ENV=='production' and (email=='demo@revify.local' or password=='demo'):
         raise RuntimeError('Configura credenciales de producción')
     with SessionLocal() as db:
         user=db.scalar(select(User).where(User.email==email.lower()))
         if not user:
-            user=User(email=email.lower(),password_hash=hash_password(password),role='commercial')
+            user=User(email=email.lower(),password_hash=hash_password(password),role='admin')
             db.add(user)
             db.flush()
+        else:
+            user.role='admin'
+            user.is_active=True
+            if force_password_sync:
+                user.password_hash=hash_password(password)
         if SEED and not (db.scalar(select(func.count()).select_from(Lead).where(Lead.assigned_user_id==user.id)) or 0):
             db.add(Lead(
                 assigned_user_id=user.id,name='Ferretería Demo',address='Carrer de Mallorca, 100',
