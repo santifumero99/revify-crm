@@ -634,10 +634,22 @@ def admin_analytics(
         .select_from(Sale)
         .where(Sale.created_at >= trend_start)
     )
+    activity_daily_joined=False
+    sales_daily_joined=False
     if postal_cond is not None:
         lead_daily_q = lead_daily_q.where(postal_cond)
         activity_daily_q = activity_daily_q.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
         sales_daily_q = sales_daily_q.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
+        activity_daily_joined=True
+        sales_daily_joined=True
+    if rep_cond is not None:
+        lead_daily_q=lead_daily_q.where(rep_cond)
+        if not activity_daily_joined:
+            activity_daily_q=activity_daily_q.join(Lead,Lead.id==Activity.lead_id)
+        if not sales_daily_joined:
+            sales_daily_q=sales_daily_q.join(Lead,Lead.id==Sale.lead_id)
+        activity_daily_q=activity_daily_q.where(rep_cond)
+        sales_daily_q=sales_daily_q.where(rep_cond)
 
     lead_daily = db.execute(lead_daily_q.group_by(func.date(Lead.created_at))).all()
     activity_daily = db.execute(activity_daily_q.group_by(func.date(Activity.created_at))).all()
@@ -662,6 +674,8 @@ def admin_analytics(
     )
     if postal_cond is not None:
         recent_q = recent_q.where(postal_cond)
+    if assigned_user_id:
+        recent_q=recent_q.where(AuditLog.actor_user_id==assigned_user_id)
     recent_rows = db.execute(recent_q.order_by(AuditLog.created_at.desc()).limit(50)).all()
     recent = [{
         "event_type": log.event_type,
@@ -670,9 +684,62 @@ def admin_analytics(
         "lead_name": lead_name or "",
     } for log, email, lead_name in recent_rows]
 
+    insights=[]
+    if overdue_followups:
+        insights.append({
+            "level":"danger",
+            "title":f"{overdue_followups} seguimientos vencidos",
+            "body":"Prioriza estos deals antes de seguir abriendo cartera nueva."
+        })
+    if stale_active_leads:
+        insights.append({
+            "level":"warning",
+            "title":f"{stale_active_leads} deals abiertos sin tocar en 7+ días",
+            "body":"Revisa si deben reactivarse, reprogramarse o cerrarse."
+        })
+    if comparison and comparison["delta_pct"]["revenue"] is not None:
+        delta=comparison["delta_pct"]["revenue"]
+        direction="sube" if delta>=0 else "baja"
+        insights.append({
+            "level":"positive" if delta>=0 else "warning",
+            "title":f"La facturación {direction} {abs(delta):.1f}% vs. el periodo anterior",
+            "body":f"Periodo actual: {revenue:.2f} € · periodo anterior: {comparison['previous']['revenue']:.2f} €."
+        })
+    zero_sale_zones=[x for x in postal_codes if x.get("visits",0)>=3 and x.get("sales",0)==0]
+    if zero_sale_zones:
+        z=sorted(zero_sale_zones,key=lambda x:x.get("visits",0),reverse=True)[0]
+        insights.append({
+            "level":"focus",
+            "title":f"{z['postal_code']} acumula {z['visits']} visitas sin venta",
+            "body":z.get("zone_short") or z.get("zone_label") or "Revisar enfoque comercial de la zona."
+        })
+    if postal_codes:
+        top_zone=max(postal_codes,key=lambda x:x.get("revenue",0))
+        if top_zone.get("revenue",0)>0:
+            insights.append({
+                "level":"positive",
+                "title":f"{top_zone['postal_code']} lidera la facturación por zona",
+                "body":f"{top_zone.get('zone_short','')} · {top_zone.get('sales',0)} ventas · {top_zone.get('revenue',0):.2f} €."
+            })
+    if categories:
+        top_cat=max(categories,key=lambda x:x.get("revenue",0))
+        if top_cat.get("revenue",0)>0:
+            insights.append({
+                "level":"focus",
+                "title":f"{top_cat['category']} es la categoría con más facturación",
+                "body":f"{top_cat.get('sales',0)} ventas · {top_cat.get('revenue',0):.2f} € en el periodo."
+            })
+    if territory_coverage_pct<100:
+        insights.append({
+            "level":"info",
+            "title":f"Cobertura territorial: {territory_coverage_pct:.1f}% de los CP de Barcelona",
+            "body":f"{territory_total-len(covered_cps)} CP todavía sin ningún deal registrado."
+        })
+    insights=insights[:6]
+
     return {
         "period": {"days": days, "start": start.isoformat() if start else None},
-        "segment": {"postal_code": postal_code or None},
+        "segment": {"postal_code": postal_code or None,"assigned_user_id":assigned_user_id},
         "available_postal_codes": all_postal_codes,
         "postal_directory":[postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())],
         "summary": {
@@ -696,7 +763,19 @@ def admin_analytics(
             "sale_per_visit_pct": round((sales / visits * 100), 1) if visits else 0,
             "revenue_per_visit": round((revenue / visits), 2) if visits else 0,
             "revenue_per_lead": round((revenue / lead_count), 2) if lead_count else 0,
+            "decision_win_rate_pct":decision_win_rate_pct,
+            "avg_days_to_sale":avg_days_to_sale,
+            "followup_scheduled_pct":followup_scheduled_pct,
+            "followup_overdue_pct":followup_overdue_pct,
+            "avg_open_age_days":avg_open_age_days,
+            "territory_coverage_pct":territory_coverage_pct,
+            "covered_postal_codes":len(covered_cps),
+            "territory_total_postal_codes":territory_total,
         },
+        "comparison":comparison,
+        "pipeline_aging":aging,
+        "whitespace":whitespace[:15],
+        "insights":insights,
         "statuses": statuses,
         "postal_codes": postal_codes,
         "categories": categories,
