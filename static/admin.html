@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="/static/admin.css?v=20260921-2145">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-2245">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -24,6 +25,7 @@
       <div class="side-brand"><div class="logo">R</div><strong>Revify</strong><span>Admin</span></div>
       <nav>
         <button class="nav active" data-tab="dashboard" onclick="showTab('dashboard')">◫ Dashboard</button>
+        <button class="nav" data-tab="map" onclick="showTab('map')">◉ Mapa comercial</button>
         <button class="nav" data-tab="postal" onclick="showTab('postal')">⌖ Zonas / CP</button>
         <button class="nav" data-tab="categories" onclick="showTab('categories')">◇ Categorías</button>
         <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
@@ -123,6 +125,51 @@
             <div id="categoryTop" class="mini-ranking"></div>
           </section>
         </div>
+      </section>
+
+      <section id="tab-map" class="tab hidden">
+        <section class="panel map-command">
+          <div class="map-toolbar">
+            <div class="map-search-wrap">
+              <label>BUSCAR CALLE / DIRECCIÓN</label>
+              <div class="map-search-row">
+                <input id="mapAddressQuery" placeholder="Ej. Carrer de Santa Teresa 12, Sant Cugat" onkeydown="if(event.key==='Enter'){event.preventDefault();searchMapAddress()}">
+                <button class="primary small" onclick="searchMapAddress()">Buscar</button>
+              </div>
+              <div id="mapAddressResults" class="map-address-results hidden"></div>
+            </div>
+            <div class="map-control">
+              <label>VISUALIZAR</label>
+              <select id="mapMetric" onchange="setMapMetric(this.value)">
+                <option value="activity">Actividad / visitas</option>
+                <option value="leads">Negocios registrados</option>
+                <option value="sales">Ventas</option>
+                <option value="revenue">Facturación</option>
+                <option value="conversion">Conversión</option>
+              </select>
+            </div>
+            <div class="map-control map-focus-control">
+              <label>ENFOQUE</label>
+              <div class="map-focus-buttons">
+                <button onclick="focusCommercialMap('all')">Global</button>
+                <button onclick="focusCommercialMap('barcelona')">Barcelona</button>
+                <button onclick="focusCommercialMap('santcugat')">Sant Cugat</button>
+                <button onclick="focusCommercialMap('rubi')">Rubí</button>
+              </div>
+            </div>
+          </div>
+          <div class="map-summary">
+            <div><span>CP objetivo trabajados</span><b id="mapWorked">0</b></div>
+            <div><span>CP objetivo totales</span><b id="mapTarget">0</b></div>
+            <div><span>Cobertura</span><b id="mapCoverage">0%</b></div>
+            <div><span>CP visibles en mapa</span><b id="mapVisible">0</b></div>
+            <div class="map-legend-inline"><i class="legend-none"></i> Sin actividad <i class="legend-low"></i> Baja <i class="legend-mid"></i> Media <i class="legend-high"></i> Alta</div>
+          </div>
+        </section>
+        <section class="panel map-panel">
+          <div id="commercialMap" class="commercial-map"></div>
+          <div class="map-source-note">Mapa base © OpenStreetMap · Límites postales: geometrías cartográficas de referencia derivadas de CNIG. Los códigos vigentes y municipios se contrastan con el callejero del INE.</div>
+        </section>
       </section>
 
       <section id="tab-postal" class="tab hidden">
@@ -229,6 +276,7 @@
     </div>
   </div>
 
-  <script src="/static/admin.js?v=20260921-2145"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="/static/admin.js?v=20260921-2245"></script>
 </body>
 </html>
