@@ -1,6 +1,6 @@
 const API='/api';
 let token=localStorage.getItem('revify_token')||'';
-let analytics={postal_codes:[],categories:[],reps:[],statuses:[],daily:[],recent:[],summary:{}};
+let analytics={postal_codes:[],postal_directory:[],categories:[],reps:[],statuses:[],daily:[],attention:[],recent:[],summary:{}};
 let reps=[];
 let adminLeadCursor=null;
 let adminLeadTimer=null;
@@ -11,6 +11,19 @@ function pct(n){return Number(n||0).toFixed(1).replace('.0','')+'%'}
 function esc(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]})}
 function dateText(v){if(!v)return '—';try{return new Date(v).toLocaleString('es-ES',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch(e){return v}}
 function statusLabel(s){return ({pending:'Pendiente',owner_absent:'No está el dueño',closed:'Local cerrado',follow_up:'Seguimiento',won:'Vendido',lost:'No interesado'})[s]||s}
+function postalInfo(cp){
+  const code=String(cp||'').trim();
+  return (analytics.postal_directory||[]).find(function(x){return x.postal_code===code})||{postal_code:code,zone_label:'Fuera del directorio Barcelona',zone_short:'Fuera de Barcelona / sin zona'};
+}
+function updatePostalHint(){
+  const input=document.getElementById('fPostal');const hint=document.getElementById('fPostalHint');
+  if(!input||!hint)return;
+  const cp=input.value.trim();
+  if(!cp){hint.textContent='Escribe un CP para ver su barrio/zona.';hint.className='';return}
+  const info=postalInfo(cp);
+  hint.textContent=cp.length===5?info.zone_label:'Completa los 5 dígitos del CP';
+  hint.className=cp.length===5?'resolved':'';
+}
 function eventLabel(s){return ({lead_created:'Lead creado',lead_updated:'Lead actualizado',activity_created:'Actividad registrada',sale_created:'Venta registrada',commercial_created:'Comercial creado',commercial_password_reset:'Contraseña restablecida',commercial_access_changed:'Acceso de comercial modificado',password_changed:'Contraseña cambiada'})[s]||s.replaceAll('_',' ')}
 
 async function req(path,opts){
@@ -52,7 +65,7 @@ function showTab(name){
   document.querySelectorAll('.nav').forEach(function(x){x.classList.toggle('active',x.dataset.tab===name)});
   const titles={
     dashboard:['Dashboard','Visión global de Revify'],
-    postal:['Códigos postales','Rendimiento geográfico de la cartera'],
+    postal:['Zonas y códigos postales','Rendimiento geográfico de la cartera'],
     categories:['Categorías','Rendimiento por tipo de comercio'],
     team:['Comerciales','Actividad, resultado y accesos'],
     leads:['Negocios','Detalle negocio a negocio'],
@@ -81,8 +94,8 @@ async function loadAnalytics(){
 function renderPostalSegment(){
   const sel=document.getElementById('postalSegment');
   const current=(analytics.segment&&analytics.segment.postal_code)||sel.value||'';
-  const options=(analytics.available_postal_codes||[]).map(function(cp){return '<option value="'+esc(cp)+'">'+esc(cp)+'</option>'}).join('');
-  sel.innerHTML='<option value="">Todos los CP</option>'+options;
+  const options=(analytics.available_postal_codes||[]).map(function(cp){const z=postalInfo(cp);return '<option value="'+esc(cp)+'">'+esc(cp)+' · '+esc(z.zone_short)+'</option>'}).join('');
+  sel.innerHTML='<option value="">Todos los CP / zonas</option>'+options;
   sel.value=current;
 }
 function renderCategoryKpis(){
@@ -109,6 +122,11 @@ function renderDashboard(){
   document.getElementById('kFollowups').textContent=num(s.followups)+' seguimientos';
   document.getElementById('kRevenuePerVisit').textContent=money(s.revenue_per_visit);
   document.getElementById('kUsers').textContent=num(s.active_users);
+  document.getElementById('kOpenDeals').textContent=num(s.open_deals);
+  document.getElementById('kFollowupsToday').textContent=num(s.followups_today);
+  document.getElementById('kOverdue').textContent=num(s.overdue_followups);
+  document.getElementById('kStale').textContent=num(s.stale_active_leads);
+  renderAttention();
 
   const total=Math.max(1,s.leads_total||0);
   document.getElementById('statusFunnel').innerHTML=(analytics.statuses||[]).map(function(x){
@@ -123,8 +141,27 @@ function renderDashboard(){
   }).join('')||'<p class="empty">Sin actividad todavía.</p>';
 
   document.getElementById('repPerformance').innerHTML=(analytics.reps||[]).map(repRow).join('');
-  renderMiniRanking('postalTop',analytics.postal_codes||[],'postal_code');
+  renderPostalRanking();
   renderMiniRanking('categoryTop',analytics.categories||[],'category');
+}
+function renderPostalRanking(){
+  const rows=(analytics.postal_codes||[]).slice(0,6);
+  const max=Math.max.apply(null,[1].concat(rows.map(function(x){return x.revenue||0})));
+  document.getElementById('postalTop').innerHTML=rows.map(function(x){
+    return '<div class="rank-row"><div><b>'+esc(x.postal_code)+' · '+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small>'+num(x.leads)+' negocios · '+num(x.sales)+' ventas</small></div><div class="rank-meter"><i style="width:'+Math.max(4,(x.revenue/max)*100)+'%"></i></div><strong>'+money(x.revenue)+'</strong></div>';
+  }).join('')||'<p class="empty">Aún no hay datos.</p>';
+}
+function renderAttention(){
+  const box=document.getElementById('attentionList');if(!box)return;
+  const rows=analytics.attention||[];
+  box.innerHTML=rows.map(function(x){
+    const when=x.reason==='Seguimiento vencido'?(x.follow_up_at?'Programado '+dateText(x.follow_up_at):'Seguimiento pendiente'):'Último movimiento '+dateText(x.updated_at);
+    return '<button class="attention-row" onclick="openAttentionLead('+x.id+')"><span class="attention-flag '+(x.reason==='Seguimiento vencido'?'overdue':'stale')+'"></span><span><b>'+esc(x.name)+'</b><small>'+esc(x.postal_code)+' · '+esc(x.zone_short)+' · '+esc(x.rep_email)+'</small></span><span><b>'+esc(x.reason)+'</b><small>'+esc(when)+'</small></span><em>›</em></button>';
+  }).join('')||'<div class="attention-empty">No hay oportunidades pendientes de atención especial.</div>';
+}
+function openAttentionLead(id){
+  showTab('leads');
+  const search=document.getElementById('fSearch');if(search)search.value=String(id);
 }
 function renderMiniRanking(id,rows,key){
   const top=rows.slice(0,6);
@@ -139,8 +176,8 @@ function metricCells(x){
 }
 function renderPostalTable(){
   const q=(document.getElementById('postalSearch')?document.getElementById('postalSearch').value:'').trim().toLowerCase();
-  const rows=(analytics.postal_codes||[]).filter(function(x){return !q||String(x.postal_code).toLowerCase().includes(q)});
-  document.getElementById('postalTable').innerHTML=rows.map(function(x){return '<tr><td><b>'+esc(x.postal_code)+'</b></td>'+metricCells(x)+'</tr>'}).join('')||'<tr><td colspan="13">Sin datos.</td></tr>';
+  const rows=(analytics.postal_codes||[]).filter(function(x){return !q||String(x.postal_code).toLowerCase().includes(q)||String(x.zone_label||'').toLowerCase().includes(q)});
+  document.getElementById('postalTable').innerHTML=rows.map(function(x){return '<tr><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td>'+metricCells(x)+'</tr>'}).join('')||'<tr><td colspan="14">Sin datos.</td></tr>';
 }
 function renderCategoryTable(){
   const q=(document.getElementById('categorySearch')?document.getElementById('categorySearch').value:'').trim().toLowerCase();
@@ -160,7 +197,7 @@ function renderCategoryTable(){
   }).join('')||'<tr><td colspan="9">Sin datos.</td></tr>';
 }
 function repRow(r){
-  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+pct(r.sale_per_visit_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td></tr>';
+  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td><span class="'+(r.overdue_followups?'risk-num':'')+'">'+num(r.overdue_followups)+'</span></td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+pct(r.sale_per_visit_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td>'+dateText(r.last_activity_at)+'</td></tr>';
 }
 function renderTeam(){
   document.getElementById('teamTable').innerHTML=(analytics.reps||[]).map(function(r){
@@ -168,7 +205,7 @@ function renderTeam(){
     if(r.role!=='admin'){
       buttons='<button data-email="'+esc(r.email)+'" onclick="resetRepPassword('+r.id+',this.dataset.email)">Contraseña</button><button class="'+(r.is_active?'danger':'')+'" onclick="toggleRep('+r.id+','+(!r.is_active)+')">'+(r.is_active?'Pausar':'Activar')+'</button>';
     }
-    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td><div class="actions">'+buttons+'</div></td></tr>';
+    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td><span class="'+(r.overdue_followups?'risk-num':'')+'">'+num(r.overdue_followups)+'</span></td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td>'+dateText(r.last_activity_at)+'</td><td><div class="actions">'+buttons+'</div></td></tr>';
   }).join('');
 }
 function renderActivity(){
@@ -195,10 +232,11 @@ async function loadAdminLeads(reset){
   const data=await req('/admin/leads?'+p.toString());adminLeadCursor=data.next_cursor||null;
   document.getElementById('leadCountLabel').textContent=num(data.total_filtered)+' negocios con los filtros actuales.';
   const html=data.items.map(function(x){
-    return '<tr><td><b>'+esc(x.name)+'</b><small class="subline">'+esc(x.address||'Sin dirección')+'</small></td><td><b>'+esc(x.postal_code)+'</b></td><td>'+esc(x.business_type)+'<small class="subline">'+esc(x.business_subtype||'—')+'</small></td><td>'+esc(x.rep_email||'Sin asignar')+'</td><td><span class="badge">'+esc(statusLabel(x.status))+'</span></td><td>'+num(x.visits)+'</td><td>'+num(x.demos)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+money(x.avg_ticket)+'</td><td><b>'+money(x.revenue)+'</b></td><td>'+esc(x.owner_name||'—')+'<small class="subline">'+esc(x.phone||'')+'</small></td><td>'+esc(x.next_action||'—')+'</td><td>'+dateText(x.updated_at)+'</td></tr>';
+    const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'—');
+    return '<tr><td><b>'+esc(x.name)+'</b><small class="subline">'+esc(x.address||'Sin dirección')+'</small></td><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td><td>'+esc(x.business_type)+'<small class="subline">'+esc(x.business_subtype||'—')+'</small></td><td>'+esc(x.rep_email||'Sin asignar')+'</td><td><span class="badge">'+esc(statusLabel(x.status))+'</span></td><td>'+num(x.visits)+'</td><td>'+num(x.demos)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+money(x.avg_ticket)+'</td><td><b>'+money(x.revenue)+'</b></td><td>'+esc(x.owner_name||'—')+'<small class="subline">'+esc(x.phone||'')+'</small></td><td>'+esc(next)+'</td><td>'+dateText(x.updated_at)+'</td></tr>';
   }).join('');
   const body=document.getElementById('businessTable');
-  if(reset)body.innerHTML=html||'<tr><td colspan="14">No hay negocios con estos filtros.</td></tr>';else body.insertAdjacentHTML('beforeend',html);
+  if(reset)body.innerHTML=html||'<tr><td colspan="15">No hay negocios con estos filtros.</td></tr>';else body.insertAdjacentHTML('beforeend',html);
   document.getElementById('adminLoadMore').classList.toggle('hidden',!adminLeadCursor);
 }
 
