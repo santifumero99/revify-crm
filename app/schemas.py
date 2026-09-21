@@ -16,6 +16,7 @@ class LeadCreate(BaseModel):
     owner_name:str=Field(default='',max_length=150)
     phone:str=Field(default='',max_length=60)
     status:str='pending'
+    initial_notes:str=Field(default='',max_length=2000)
     follow_up_at:Optional[datetime]=None
     sale_quantity:int=Field(default=1,ge=1,le=1000)
     sale_unit_price:Decimal=Field(default=Decimal('25.00'),gt=0,le=100000)
