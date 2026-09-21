@@ -4,6 +4,7 @@ let analytics={postal_codes:[],postal_directory:[],categories:[],reps:[],statuse
 let reps=[];
 let adminLeadCursor=null;
 let adminLeadTimer=null;
+let visibleBusinesses=[];
 
 function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n||0))}
 function num(n){return new Intl.NumberFormat('es-ES').format(Number(n||0))}
@@ -82,16 +83,25 @@ async function loadEverything(){await loadAnalytics();await loadAdminLeads(true)
 async function loadAnalytics(){
   const days=document.getElementById('periodSelect').value||'30';
   const postal=document.getElementById('postalSegment').value||'';
+  const rep=document.getElementById('globalRep')?.value||'';
   const params=new URLSearchParams({days:days});
   if(postal)params.set('postal_code',postal);
+  if(rep)params.set('assigned_user_id',rep);
   analytics=await req('/admin/analytics?'+params.toString());
   reps=analytics.reps||[];
+  renderGlobalRep();
   renderPostalSegment();
   updatePostalHint();
-  renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();
+  renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();renderTerritory();
   if(document.getElementById('tab-leads')&&!document.getElementById('tab-leads').classList.contains('hidden'))loadAdminLeads(true);
 }
 
+function renderGlobalRep(){
+  const sel=document.getElementById('globalRep');if(!sel)return;
+  const current=String((analytics.segment&&analytics.segment.assigned_user_id)||sel.value||'');
+  sel.innerHTML='<option value="">Todo el equipo</option>'+(reps||[]).filter(function(r){return r.role!=='admin'}).map(function(r){return '<option value="'+r.id+'">'+esc(r.email)+'</option>'}).join('');
+  sel.value=current;
+}
 function renderPostalSegment(){
   const sel=document.getElementById('postalSegment');
   const current=(analytics.segment&&analytics.segment.postal_code)||sel.value||'';
@@ -216,7 +226,7 @@ function renderActivity(){
   }).join('')||'<p class="empty">Aún no hay actividad.</p>';
 }
 function renderRepFilters(){
-  const sel=document.getElementById('fRep');const current=sel.value;
+  const sel=document.getElementById('fRep');const global=document.getElementById('globalRep')?.value||'';const current=global||sel.value;
   sel.innerHTML='<option value="">Todos los comerciales</option>'+reps.filter(function(r){return r.role!=='admin'}).map(function(r){return '<option value="'+r.id+'">'+esc(r.email)+'</option>'}).join('');
   sel.value=current;
 }
