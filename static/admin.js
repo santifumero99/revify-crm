@@ -129,7 +129,7 @@ function renderDashboard(){
   document.getElementById('kLeads').textContent=num(s.leads_total);
   document.getElementById('kNewLeads').textContent=num(s.new_leads)+' nuevos'+deltaText('new_leads');
   document.getElementById('kRevenue').textContent=money(s.revenue);
-  document.getElementById('kUnits').textContent=num(s.units)+' NFC ·'+(deltaText('revenue')||'').replace(/^ · /,' ');
+  document.getElementById('kUnits').textContent=num(s.units)+' NFC vendidos'+(deltaText('revenue')||'');
   document.getElementById('kSales').textContent=num(s.sales);
   document.getElementById('kAvgTicket').textContent='Ticket '+money(s.avg_ticket)+(deltaText('sales')||'');
   document.getElementById('kPortfolioConversion').textContent=pct(s.portfolio_conversion_pct);
@@ -217,10 +217,7 @@ function renderTerritory(){
   const b=document.getElementById('postalCoverageBar');if(b)b.style.width=pctv+'%';
   const t=document.getElementById('postalCoverageText');if(t)t.textContent=num(s.covered_postal_codes)+' de '+num(s.territory_total_postal_codes)+' códigos postales con deals.';
   const box=document.getElementById('whitespaceList');
-  if(box)box.innerHTML=(analytics.whitespace||[]).slice(0,12).map(function(x){return '<button onclick="filterPostalZone(\''+esc(x.postal_code)+'\')"><b>'+esc(x.postal_code)+'</b><span>'+esc(x.zone_short)+'</span></button>'}).join('')||'<div class="attention-empty">Toda la cobertura postal del directorio ya tiene actividad.</div>';
-}
-function filterPostalZone(cp){
-  const sel=document.getElementById('postalSegment');if(sel){sel.value=cp;loadAnalytics()}
+  if(box)box.innerHTML=(analytics.whitespace||[]).slice(0,12).map(function(x){return '<button type="button"><b>'+esc(x.postal_code)+'</b><span>'+esc(x.zone_short)+'</span></button>'}).join('')||'<div class="attention-empty">Toda la cobertura postal del directorio ya tiene actividad.</div>';
 }
 function renderMiniRanking(id,rows,key){
   const top=rows.slice(0,6);
