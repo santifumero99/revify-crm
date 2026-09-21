@@ -123,7 +123,86 @@ async function openLead(id){
     const x=await api('/leads/'+id);currentLeadId=id;
     hideScreens();showAppNav();document.getElementById('screen-lead-detail').classList.add('active');setNav('leads');
     const editable=x.status!=='won';
-    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div></div><div class="detail-actions">${editable?`<button onclick="cycleStatus(${x.id},'${x.status}')">Actualizar estado</button><button onclick="registerActivity(${x.id})">Registrar visita</button>`:'<button onclick="showSales()">Ver venta</button>'}</div></div>`;
+    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div><div><span>ÚLTIMA ACTUALIZACIÓN</span><b>${dateTime(x.updated_at)}</b></div></div><div class="detail-actions">${editable?`<button class="blue" onclick="editLead(${x.id})">Editar deal</button><button onclick="registerActivity(${x.id})">Nueva visita</button>`:'<button onclick="editLead(${x.id})">Editar datos</button><button onclick="showSales()">Ver venta</button>'}</div></div>`;
+  }catch(err){toast(err.message)}
+}
+
+function businessTypeOptions(selected){
+  const opts=['Restauración / Hostelería','Comercio / Retail','Belleza / Estética','Salud / Bienestar','Hogar / Reformas','Automoción / Movilidad','Servicios profesionales','Educación / Formación','Ocio / Turismo / Alojamiento','Otros servicios'];
+  return opts.map(v=>`<option ${v===selected?'selected':''}>${escapeHtml(v)}</option>`).join('');
+}
+function editStatusOptions(selected,locked=false){
+  if(locked)return '<option value="won" selected>Vendido</option>';
+  return [
+    ['pending','Pendiente / en curso'],
+    ['owner_absent','No está el dueño'],
+    ['closed','Local cerrado'],
+    ['follow_up','Seguimiento'],
+    ['lost','No vendido'],
+    ['won','Vendido — registrar venta']
+  ].map(([v,l])=>`<option value="${v}" ${v===selected?'selected':''}>${l}</option>`).join('');
+}
+function toggleEditSaleFields(originalStatus){
+  const status=document.getElementById('editStatus')?.value;
+  const box=document.getElementById('editSaleFields');
+  if(box)box.style.display=(status==='won'&&originalStatus!=='won')?'block':'none';
+  calcEditSaleTotal();
+}
+function calcEditSaleTotal(){
+  const q=Math.max(1,Number(document.getElementById('editSaleQuantity')?.value||1));
+  const p=Math.max(.01,Number(document.getElementById('editSaleUnitPrice')?.value||25));
+  const out=document.getElementById('editSaleTotal');
+  if(out)out.textContent=money(q*p);
+}
+async function editLead(id){
+  try{
+    const x=await api('/leads/'+id);
+    const locked=x.status==='won';
+    document.getElementById('leadDetail').innerHTML=`<form class="create-card" onsubmit="saveLeadEdit(event,${x.id},'${x.status}')"><div class="create-grid">
+      <div class="create-field full"><label>NOMBRE DEL NEGOCIO *</label><input id="editName" required value="${escapeHtml(x.name)}"></div>
+      <div class="create-field full"><label>DIRECCIÓN</label><input id="editAddress" value="${escapeHtml(x.address||'')}"></div>
+      <div class="create-field"><label>CÓDIGO POSTAL *</label><input id="editPostalCode" required inputmode="numeric" pattern="[0-9]{5}" maxlength="5" value="${escapeHtml(x.postal_code||'')}"></div>
+      <div class="create-field"><label>CATEGORÍA *</label><select id="editBusinessType" required>${businessTypeOptions(x.business_type)}</select></div>
+      <div class="create-field"><label>TIPO CONCRETO</label><input id="editBusinessSubtype" value="${escapeHtml(x.business_subtype||'')}"></div>
+      <div class="create-field"><label>CONTACTO / DUEÑO</label><input id="editOwner" value="${escapeHtml(x.owner_name||'')}"></div>
+      <div class="create-field"><label>TELÉFONO</label><input id="editPhone" inputmode="tel" value="${escapeHtml(x.phone||'')}"></div>
+      <div class="create-field full"><label>ESTADO ACTUAL *</label><select id="editStatus" ${locked?'disabled':''} onchange="toggleEditSaleFields('${x.status}')">${editStatusOptions(x.status,locked)}</select></div>
+      <div class="create-field full" id="editSaleFields" style="display:none"><div style="border:1px solid #dfe7f1;border-radius:12px;padding:9px;background:#f8fbff"><div style="font-size:11px;font-weight:900;color:#17365f;margin-bottom:3px">VENTA</div><div style="font-size:9px;color:#64748b;margin-bottom:10px">Este mismo deal pasará a Vendido y la venta aparecerá en Ventas.</div><div class="create-grid">
+        <div class="create-field"><label>UNIDADES NFC</label><input id="editSaleQuantity" type="number" min="1" max="1000" value="1" oninput="calcEditSaleTotal()"></div>
+        <div class="create-field"><label>PRECIO UNITARIO (€)</label><input id="editSaleUnitPrice" type="number" min="0.01" step="0.01" value="25.00" oninput="calcEditSaleTotal()"></div>
+        <div class="create-field"><label>COBRADO CON</label><select id="editPaymentMethod"><option value="card" selected>Tarjeta</option><option value="cash">Efectivo</option><option value="bizum">Bizum</option><option value="transfer">Transferencia</option><option value="other">Otro</option></select></div>
+        <div class="create-field"><label>ENTREGA</label><select id="editDelivered"><option value="true">Entregado</option><option value="false">Pendiente de entregar</option></select></div>
+        <div class="create-field full" style="margin-bottom:0"><label>TOTAL VENTA</label><div class="total-box" style="margin-top:0"><span>Importe registrado</span><b id="editSaleTotal">€25,00</b></div></div>
+      </div></div></div>
+    </div><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px"><button type="button" class="ghostbtn" onclick="openLead(${x.id})">Cancelar</button><button class="save-lead">Guardar cambios</button></div></form>`;
+    toggleEditSaleFields(x.status);
+  }catch(err){toast(err.message)}
+}
+async function saveLeadEdit(e,id,originalStatus){
+  e.preventDefault();
+  const status=originalStatus==='won'?'won':document.getElementById('editStatus').value;
+  const payload={
+    name:document.getElementById('editName').value.trim(),
+    address:document.getElementById('editAddress').value.trim(),
+    postal_code:document.getElementById('editPostalCode').value.replace(/\D/g,'').slice(0,5),
+    business_type:document.getElementById('editBusinessType').value,
+    business_subtype:document.getElementById('editBusinessSubtype').value.trim(),
+    owner_name:document.getElementById('editOwner').value.trim(),
+    phone:document.getElementById('editPhone').value.trim(),
+    status
+  };
+  if(payload.postal_code.length!==5){toast('Código postal de 5 dígitos');return}
+  if(status==='won'&&originalStatus!=='won'){
+    payload.sale_quantity=Math.max(1,Number(document.getElementById('editSaleQuantity').value||1));
+    payload.sale_unit_price=Math.max(.01,Number(document.getElementById('editSaleUnitPrice').value||25));
+    payload.sale_payment_method=document.getElementById('editPaymentMethod').value;
+    payload.sale_delivered=document.getElementById('editDelivered').value==='true';
+  }
+  try{
+    await api('/leads/'+id,{method:'PATCH',body:JSON.stringify(payload)});
+    toast(status==='won'&&originalStatus!=='won'?'Deal actualizado y venta registrada':'Deal actualizado');
+    await openLead(id);
+    loadDashboard();
   }catch(err){toast(err.message)}
 }
 
@@ -134,7 +213,7 @@ async function cycleStatus(id,current){
   try{await api('/leads/'+id,{method:'PATCH',body:JSON.stringify({status:next})});await openLead(id);toast('Estado actualizado')}catch(err){toast(err.message)}
 }
 async function registerActivity(id){
-  try{await api('/leads/'+id+'/activities',{method:'POST',body:JSON.stringify({activity_type:'visit',notes:''})});toast('Visita registrada');await loadDashboard()}catch(err){toast(err.message)}
+  try{await api('/leads/'+id+'/activities',{method:'POST',body:JSON.stringify({activity_type:'visit',notes:''})});toast('Nueva visita registrada');await openLead(id);await loadDashboard()}catch(err){toast(err.message)}
 }
 
 function toggleCreateSaleFields(){
