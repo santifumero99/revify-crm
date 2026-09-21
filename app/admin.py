@@ -279,8 +279,12 @@ def admin_analytics(
     if start and days>0:
         period_end=utcnow()
         span=period_end-start
-        prev_start=start-span
-        prev_end=start
+        if days==1:
+            prev_start=start-timedelta(days=1)
+            prev_end=prev_start+span
+        else:
+            prev_start=start-span
+            prev_end=start
 
         prev_leads_q=select(func.count()).select_from(Lead).where(Lead.created_at>=prev_start,Lead.created_at<prev_end)
         prev_activity_q=select(
