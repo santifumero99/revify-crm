@@ -38,6 +38,7 @@
       <header>
         <div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Visión global de Revify</p></div>
         <div class="header-actions">
+          <select id="postalSegment" onchange="loadAnalytics()"><option value="">Todos los CP</option></select>
           <select id="periodSelect" onchange="loadAnalytics()">
             <option value="1">Hoy</option>
             <option value="7">Últimos 7 días</option>
@@ -97,9 +98,17 @@
       </section>
 
       <section id="tab-categories" class="tab hidden">
+        <div id="categoryKpis" class="segment-kpis">
+          <article class="seg-card blue"><span>Negocios</span><b id="catKLeads">0</b></article>
+          <article class="seg-card green"><span>Vendidos</span><b id="catKWon">0</b></article>
+          <article class="seg-card purple"><span>Visitas</span><b id="catKVisits">0</b></article>
+          <article class="seg-card amber"><span>Unidades</span><b id="catKUnits">0</b></article>
+          <article class="seg-card cyan"><span>Conversión</span><b id="catKConv">0%</b></article>
+          <article class="seg-card navy"><span>Facturación</span><b id="catKRevenue">0 €</b></article>
+        </div>
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento por categoría</h2><p>Qué verticales convierten y facturan mejor.</p></div><input id="categorySearch" class="small-search" placeholder="Buscar categoría..." oninput="renderCategoryTable()"></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>Categoría</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="categoryTable"></tbody></table></div>
+          <div class="table-wrap"><table class="wide category-table"><thead><tr><th>Categoría</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Unidades</th><th>Conversión</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="categoryTable"></tbody></table></div>
         </section>
       </section>
 
