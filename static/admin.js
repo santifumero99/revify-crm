@@ -68,11 +68,32 @@ async function loadEverything(){await loadAnalytics();await loadAdminLeads(true)
 
 async function loadAnalytics(){
   const days=document.getElementById('periodSelect').value||'30';
-  analytics=await req('/admin/analytics?days='+encodeURIComponent(days));
+  const postal=document.getElementById('postalSegment').value||'';
+  const params=new URLSearchParams({days:days});
+  if(postal)params.set('postal_code',postal);
+  analytics=await req('/admin/analytics?'+params.toString());
   reps=analytics.reps||[];
-  renderDashboard();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();
+  renderPostalSegment();
+  renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();
+  if(document.getElementById('tab-leads')&&!document.getElementById('tab-leads').classList.contains('hidden'))loadAdminLeads(true);
 }
 
+function renderPostalSegment(){
+  const sel=document.getElementById('postalSegment');
+  const current=(analytics.segment&&analytics.segment.postal_code)||sel.value||'';
+  const options=(analytics.available_postal_codes||[]).map(function(cp){return '<option value="'+esc(cp)+'">'+esc(cp)+'</option>'}).join('');
+  sel.innerHTML='<option value="">Todos los CP</option>'+options;
+  sel.value=current;
+}
+function renderCategoryKpis(){
+  const s=analytics.summary||{};
+  document.getElementById('catKLeads').textContent=num(s.leads_total);
+  document.getElementById('catKWon').textContent=num(s.won_total);
+  document.getElementById('catKVisits').textContent=num(s.visits);
+  document.getElementById('catKUnits').textContent=num(s.units);
+  document.getElementById('catKConv').textContent=pct(s.portfolio_conversion_pct);
+  document.getElementById('catKRevenue').textContent=money(s.revenue);
+}
 function renderDashboard(){
   const s=analytics.summary||{};
   document.getElementById('kLeads').textContent=num(s.leads_total);
@@ -124,7 +145,19 @@ function renderPostalTable(){
 function renderCategoryTable(){
   const q=(document.getElementById('categorySearch')?document.getElementById('categorySearch').value:'').trim().toLowerCase();
   const rows=(analytics.categories||[]).filter(function(x){return !q||String(x.category).toLowerCase().includes(q)});
-  document.getElementById('categoryTable').innerHTML=rows.map(function(x){return '<tr><td><b>'+esc(x.category)+'</b></td>'+metricCells(x)+'</tr>'}).join('')||'<tr><td colspan="13">Sin datos.</td></tr>';
+  document.getElementById('categoryTable').innerHTML=rows.map(function(x){
+    return '<tr>'+
+      '<td><b>'+esc(x.category)+'</b></td>'+
+      '<td><span class="metric-chip m-blue">'+num(x.leads)+'</span></td>'+
+      '<td><span class="metric-chip m-green">'+num(x.won)+'</span></td>'+
+      '<td><span class="metric-chip m-purple">'+num(x.visits)+'</span></td>'+
+      '<td><span class="metric-chip m-amber">'+num(x.units)+'</span></td>'+
+      '<td><span class="metric-chip m-cyan">'+pct(x.conversion_pct)+'</span></td>'+
+      '<td><span class="metric-chip m-slate">'+money(x.avg_ticket)+'</span></td>'+
+      '<td><span class="metric-chip m-rose">'+money(x.revenue_per_lead)+'</span></td>'+
+      '<td><span class="metric-chip m-navy">'+money(x.revenue)+'</span></td>'+
+    '</tr>';
+  }).join('')||'<tr><td colspan="9">Sin datos.</td></tr>';
 }
 function repRow(r){
   return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+pct(r.sale_per_visit_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td></tr>';
@@ -154,7 +187,7 @@ async function loadAdminLeads(reset){
   if(reset)adminLeadCursor=null;
   const p=new URLSearchParams({limit:'50'});
   const search=document.getElementById('fSearch').value.trim();
-  const postal=document.getElementById('fPostal').value.trim();
+  const postal=document.getElementById('fPostal').value.trim()||document.getElementById('postalSegment').value||'';
   const rep=document.getElementById('fRep').value;
   const status=document.getElementById('fStatus').value;
   const cat=document.getElementById('fCategory').value;
