@@ -751,6 +751,7 @@ def admin_analytics(
                 func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
                 func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
                 func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+                func.count(func.distinct(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), Activity.lead_id), else_=None))),
             )
             .select_from(Activity)
             .where(Activity.actor_user_id == u.id)
