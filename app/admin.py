@@ -276,6 +276,60 @@ def admin_analytics(
     units = int(sales_total[1] or 0)
     revenue = float(sales_total[2] or 0)
 
+    comparison=None
+    if start and days>0:
+        period_end=utcnow()
+        span=period_end-start
+        prev_start=start-span
+        prev_end=start
+
+        prev_leads_q=select(func.count()).select_from(Lead).where(Lead.created_at>=prev_start,Lead.created_at<prev_end)
+        prev_activity_q=select(
+            func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES),1),else_=0))
+        ).select_from(Activity).where(Activity.created_at>=prev_start,Activity.created_at<prev_end)
+        prev_sales_q=select(
+            func.count(Sale.id),
+            func.coalesce(func.sum(Sale.total),0)
+        ).select_from(Sale).where(Sale.created_at>=prev_start,Sale.created_at<prev_end)
+
+        prev_activity_joined=False
+        prev_sales_joined=False
+        if postal_cond is not None:
+            prev_leads_q=prev_leads_q.where(postal_cond)
+            prev_activity_q=prev_activity_q.join(Lead,Lead.id==Activity.lead_id).where(postal_cond)
+            prev_sales_q=prev_sales_q.join(Lead,Lead.id==Sale.lead_id).where(postal_cond)
+            prev_activity_joined=True
+            prev_sales_joined=True
+        if rep_cond is not None:
+            prev_leads_q=prev_leads_q.where(rep_cond)
+            if not prev_activity_joined:
+                prev_activity_q=prev_activity_q.join(Lead,Lead.id==Activity.lead_id)
+            if not prev_sales_joined:
+                prev_sales_q=prev_sales_q.join(Lead,Lead.id==Sale.lead_id)
+            prev_activity_q=prev_activity_q.where(rep_cond)
+            prev_sales_q=prev_sales_q.where(rep_cond)
+
+        prev_leads=int(db.scalar(prev_leads_q) or 0)
+        prev_visits=int(db.scalar(prev_activity_q) or 0)
+        prev_sales_row=db.execute(prev_sales_q).one()
+        prev_sales=int(prev_sales_row[0] or 0)
+        prev_revenue=float(prev_sales_row[1] or 0)
+
+        def delta_pct(current,previous):
+            if not previous:
+                return None
+            return round(((current-previous)/previous)*100,1)
+
+        comparison={
+            "previous":{"new_leads":prev_leads,"visits":prev_visits,"sales":prev_sales,"revenue":prev_revenue},
+            "delta_pct":{
+                "new_leads":delta_pct(new_leads,prev_leads),
+                "visits":delta_pct(visits,prev_visits),
+                "sales":delta_pct(sales,prev_sales),
+                "revenue":delta_pct(revenue,prev_revenue)
+            }
+        }
+
     status_q = select(Lead.status, func.count(Lead.id)).group_by(Lead.status).order_by(func.count(Lead.id).desc())
     if postal_cond is not None:
         status_q = status_q.where(postal_cond)
