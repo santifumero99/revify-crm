@@ -144,7 +144,7 @@ def geocode_target_address(query: str):
         "addressdetails":1,
         "limit":8,
         "countrycodes":"es",
-        "viewbox":"1.90,41.62,2.26,41.28",
+        "viewbox":"1.65,41.70,2.45,41.15",
         "bounded":1,
         "accept-language":"ca,es",
     })
@@ -164,7 +164,7 @@ def geocode_target_address(query: str):
             addr.get("municipality") or addr.get("county") or ""
         )
         normalized=municipality.lower().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u").replace("à","a").replace("è","e").replace("ò","o").replace("ï","i").replace("ü","u")
-        is_target=cp in POSTAL_ZONE_MAP or any(x in normalized for x in ["barcelona","sant cugat","rubi","rubí"])
+        is_target=cp.startswith("08") or cp in POSTAL_ZONE_MAP or any(x in normalized for x in ["barcelona","sant cugat","rubi","rubí"])
         if not is_target:
             continue
         key=(item.get("display_name",""),cp)
