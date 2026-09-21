@@ -26,7 +26,6 @@ def lead_out(x:Lead):
         'owner_name':x.owner_name or '','phone':x.phone or '','status':x.status,
         'next_action':x.next_action or '',
         'follow_up_at':x.follow_up_at.isoformat() if x.follow_up_at else None,
-        'follow_up_at':x.follow_up_at.isoformat() if x.follow_up_at else None,
         'created_at':x.created_at.isoformat(),
         'updated_at':x.updated_at.isoformat()
     }
@@ -60,8 +59,17 @@ def decode_cursor(c:str):
     except Exception:
         raise HTTPException(400,'Cursor no válido')
 
-app=FastAPI(title='Revify CRM',version='1.1.0')
+app=FastAPI(title='Revify CRM',version='1.2.0')
 app.include_router(admin_router)
+
+@app.middleware('http')
+async def disable_frontend_cache(request:Request,call_next):
+    response=await call_next(request)
+    if request.url.path=='/' or request.url.path.startswith('/static/'):
+        response.headers['Cache-Control']='no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma']='no-cache'
+        response.headers['Expires']='0'
+    return response
 
 @app.on_event('startup')
 def startup():
@@ -114,7 +122,7 @@ def me(user:User=Depends(current_user)):
 @app.get('/api/metrics')
 def metrics(user:User=Depends(current_user),db:Session=Depends(get_db)):
     today=utcnow().replace(hour=0,minute=0,second=0,microsecond=0)
-    visits=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type=='visit',Activity.created_at>=today)) or 0
+    visits=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type.in_(['visit','demo','follow_up','owner_absent','closed','no_interest']),Activity.created_at>=today)) or 0
     demos=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type=='demo',Activity.created_at>=today)) or 0
     sales=db.scalar(select(func.count()).select_from(Sale).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
     revenue=db.scalar(select(func.coalesce(func.sum(Sale.total),0)).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
@@ -191,7 +199,7 @@ def create_lead(data:LeadCreate,user:User=Depends(current_user),db:Session=Depen
     if data.status=='won' and data.sale_payment_method not in VALID_PAYMENT_METHODS:
         raise HTTPException(400,'Método de pago no válido')
 
-    next_action='Venta registrada' if data.status=='won' else ('Sin venta' if data.status=='lost' else 'Primera visita pendiente')
+    next_action={'won':'Venta registrada','lost':'Sin venta','follow_up':'Seguimiento pendiente','owner_absent':'Volver cuando esté el dueño','closed':'Volver a visitar'}.get(data.status,'Pendiente de visita')
     x=Lead(
         assigned_user_id=user.id,
         name=data.name.strip(),
@@ -208,6 +216,8 @@ def create_lead(data:LeadCreate,user:User=Depends(current_user),db:Session=Depen
     db.add(x)
     db.flush()
     audit(db,user.id,'lead_created',x.id,{'status':x.status})
+    initial_activity={'owner_absent':'owner_absent','closed':'closed','follow_up':'follow_up','lost':'no_interest'}.get(data.status,'visit')
+    db.add(Activity(lead_id=x.id,actor_user_id=user.id,activity_type=initial_activity,notes='Alta inicial del deal'))
 
     sale=None
     if data.status=='won':
