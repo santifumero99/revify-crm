@@ -5,6 +5,14 @@ let reps=[];
 let adminLeadCursor=null;
 let adminLeadTimer=null;
 let visibleBusinesses=[];
+let commercialMap=null;
+let postalGeoLayer=null;
+let postalGeoData=null;
+let postalMunicipalities={};
+let postalLayersByCp={};
+let mapMetric='activity';
+let mapAddressMarker=null;
+let mapSearchResults=[];
 
 function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR'}).format(Number(n||0))}
 function num(n){return new Intl.NumberFormat('es-ES').format(Number(n||0))}
@@ -14,7 +22,7 @@ function dateText(v){if(!v)return '—';try{return new Date(v).toLocaleString('e
 function statusLabel(s){return ({pending:'Pendiente',owner_absent:'No está el dueño',closed:'Local cerrado',follow_up:'Seguimiento',won:'Vendido',lost:'No interesado'})[s]||s}
 function postalInfo(cp){
   const code=String(cp||'').trim();
-  return (analytics.postal_directory||[]).find(function(x){return x.postal_code===code})||{postal_code:code,zone_label:'Fuera del directorio Barcelona',zone_short:'Fuera de Barcelona / sin zona'};
+  return (analytics.postal_directory||[]).find(function(x){return x.postal_code===code})||{postal_code:code,municipality:'',zone_label:'Periferia / fuera del directorio objetivo',zone_short:'Periferia',is_special:false,is_coverage_code:false};
 }
 function updatePostalHint(){
   const input=document.getElementById('fPostal');const hint=document.getElementById('fPostalHint');
@@ -66,6 +74,7 @@ function showTab(name){
   document.querySelectorAll('.nav').forEach(function(x){x.classList.toggle('active',x.dataset.tab===name)});
   const titles={
     dashboard:['Dashboard','Visión global de Revify'],
+    map:['Mapa comercial','Cobertura territorial, códigos postales y actividad de calle'],
     postal:['Zonas y códigos postales','Rendimiento geográfico de la cartera'],
     categories:['Categorías','Rendimiento por tipo de comercio'],
     team:['Comerciales','Actividad, resultado y accesos'],
@@ -76,6 +85,7 @@ function showTab(name){
   document.getElementById('pageTitle').textContent=titles[name][0];
   document.getElementById('pageSubtitle').textContent=titles[name][1];
   if(name==='leads')loadAdminLeads(true);
+  if(name==='map')setTimeout(function(){initCommercialMap()},30);
 }
 
 async function loadEverything(){await loadAnalytics();await loadAdminLeads(true)}
@@ -93,7 +103,181 @@ async function loadAnalytics(){
   renderPostalSegment();
   updatePostalHint();
   renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();renderTerritory();
+  if(document.getElementById('tab-map')&&!document.getElementById('tab-map').classList.contains('hidden'))setTimeout(function(){initCommercialMap(true)},20);
   if(document.getElementById('tab-leads')&&!document.getElementById('tab-leads').classList.contains('hidden'))loadAdminLeads(true);
+}
+
+
+function municipalityForCp(cp){
+  const names=postalMunicipalities[String(cp||'')]||[];
+  return names.length?names.join(' · '):(postalInfo(cp).municipality||'Periferia de Barcelona');
+}
+function mapMetricsByCp(){
+  const out={};
+  (analytics.postal_codes||[]).forEach(function(x){out[String(x.postal_code)]=x});
+  return out;
+}
+function mapMetricValue(row){
+  row=row||{};
+  if(mapMetric==='leads')return Number(row.leads||0);
+  if(mapMetric==='sales')return Number(row.sales||0);
+  if(mapMetric==='revenue')return Number(row.revenue||0);
+  if(mapMetric==='conversion')return Number(row.sale_per_visit_pct||row.conversion_pct||0);
+  return Number(row.visits||0);
+}
+function mapMetricLabel(row){
+  row=row||{};
+  if(mapMetric==='leads')return num(row.leads||0)+' negocios';
+  if(mapMetric==='sales')return num(row.sales||0)+' ventas';
+  if(mapMetric==='revenue')return money(row.revenue||0);
+  if(mapMetric==='conversion')return pct(row.sale_per_visit_pct||row.conversion_pct||0);
+  return num(row.visits||0)+' visitas';
+}
+function mapPalette(value,max,isTarget){
+  if(!value)return {fill:isTarget?'#edf2f7':'#f5f6f8',opacity:isTarget?.55:.22};
+  const ratio=max?Math.min(1,value/max):1;
+  if(mapMetric==='sales'||mapMetric==='revenue'){
+    if(ratio>.66)return {fill:'#0b8a5a',opacity:.72};
+    if(ratio>.33)return {fill:'#48b987',opacity:.62};
+    return {fill:'#bcebd5',opacity:.58};
+  }
+  if(mapMetric==='conversion'){
+    if(ratio>.66)return {fill:'#6547c7',opacity:.72};
+    if(ratio>.33)return {fill:'#9a84e5',opacity:.62};
+    return {fill:'#d9d0f8',opacity:.58};
+  }
+  if(ratio>.66)return {fill:'#1268de',opacity:.72};
+  if(ratio>.33)return {fill:'#5b9df2',opacity:.64};
+  return {fill:'#bdd9fb',opacity:.58};
+}
+function postalPopupHtml(cp,row){
+  row=row||{};
+  const info=postalInfo(cp);
+  const municipality=municipalityForCp(cp);
+  const zone=info.is_coverage_code?info.zone_label:municipality;
+  return '<div class="postal-popup"><div class="postal-popup-head"><b>'+esc(cp)+'</b><span>'+esc(municipality)+'</span></div>'+
+    '<p>'+esc(zone||'')+'</p>'+
+    '<div class="postal-popup-grid">'+
+      '<div><span>Negocios</span><b>'+num(row.leads||0)+'</b></div>'+
+      '<div><span>Visitas</span><b>'+num(row.visits||0)+'</b></div>'+
+      '<div><span>Ventas</span><b>'+num(row.sales||0)+'</b></div>'+
+      '<div><span>Facturación</span><b>'+money(row.revenue||0)+'</b></div>'+
+      '<div><span>Conversión</span><b>'+pct(row.sale_per_visit_pct||row.conversion_pct||0)+'</b></div>'+
+      '<div><span>Unidades</span><b>'+num(row.units||0)+'</b></div>'+
+    '</div><button onclick="openPostalPortfolio(\''+esc(cp)+'\')">Ver negocios de este CP</button></div>';
+}
+function stylePostalFeature(feature){
+  const cp=String(feature.properties&&feature.properties.postal_code||'');
+  const metrics=mapMetricsByCp();
+  const row=metrics[cp]||{};
+  const target=new Set(analytics.coverage_postal_codes||[]);
+  const isTarget=target.has(cp);
+  const values=Object.values(metrics).map(mapMetricValue).filter(function(v){return v>0});
+  const max=mapMetric==='conversion'?100:Math.max.apply(null,[1].concat(values));
+  const pal=mapPalette(mapMetricValue(row),max,isTarget);
+  return {color:isTarget?'#516175':'#a8b3c1',weight:isTarget?1.35:.7,fillColor:pal.fill,fillOpacity:pal.opacity,dashArray:isTarget?null:'3 3'};
+}
+function updateMapSummary(){
+  const target=new Set(analytics.coverage_postal_codes||[]);
+  const metrics=mapMetricsByCp();
+  let worked=0;
+  target.forEach(function(cp){const r=metrics[cp];if(r&&Number(r.visits||0)>0)worked++});
+  const total=target.size;
+  const unique=new Set((postalGeoData&&postalGeoData.features||[]).map(function(f){return String(f.properties.postal_code)}));
+  document.getElementById('mapWorked').textContent=num(worked);
+  document.getElementById('mapTarget').textContent=num(total);
+  document.getElementById('mapCoverage').textContent=pct(total?worked/total*100:0);
+  document.getElementById('mapVisible').textContent=num(unique.size);
+}
+async function initCommercialMap(refreshOnly){
+  if(!window.L){return}
+  if(!postalGeoData){
+    try{
+      const results=await Promise.all([
+        fetch('/static/postal-metro.geojson').then(function(r){return r.json()}),
+        fetch('/static/postal-municipalities.json').then(function(r){return r.json()})
+      ]);
+      postalGeoData=results[0];
+      postalMunicipalities=(results[1]&&results[1].postal_codes)||{};
+    }catch(e){console.error('No se pudo cargar el mapa postal',e);return}
+  }
+  if(!commercialMap){
+    commercialMap=L.map('commercialMap',{zoomControl:true,minZoom:8,maxZoom:18}).setView([41.43,2.08],10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      maxZoom:19,
+      attribution:'&copy; OpenStreetMap contributors'
+    }).addTo(commercialMap);
+  }
+  if(postalGeoLayer){postalGeoLayer.remove();postalLayersByCp={}}
+  const metrics=mapMetricsByCp();
+  const target=new Set(analytics.coverage_postal_codes||[]);
+  postalGeoLayer=L.geoJSON(postalGeoData,{
+    style:stylePostalFeature,
+    onEachFeature:function(feature,layer){
+      const cp=String(feature.properties.postal_code||'');
+      if(!postalLayersByCp[cp])postalLayersByCp[cp]=[];
+      postalLayersByCp[cp].push(layer);
+      layer.bindTooltip('<b>'+esc(cp)+'</b><br>'+esc(municipalityForCp(cp)),{
+        permanent:target.has(cp),
+        direction:'center',
+        className:target.has(cp)?'postal-label target':'postal-label'
+      });
+      layer.on('click',function(){
+        layer.bindPopup(postalPopupHtml(cp,metrics[cp]||{}),{maxWidth:310}).openPopup();
+      });
+      layer.on('mouseover',function(){layer.setStyle({weight:2.2})});
+      layer.on('mouseout',function(){if(postalGeoLayer)postalGeoLayer.resetStyle(layer)});
+    }
+  }).addTo(commercialMap);
+  updateMapSummary();
+  setTimeout(function(){commercialMap.invalidateSize()},50);
+  if(!refreshOnly)focusCommercialMap('all');
+}
+function setMapMetric(metric){
+  mapMetric=metric||'activity';
+  if(postalGeoLayer)postalGeoLayer.setStyle(stylePostalFeature);
+}
+function focusCommercialMap(scope){
+  if(!commercialMap)return;
+  const bounds={
+    all:[[41.23,1.78],[41.64,2.36]],
+    barcelona:[[41.31,2.03],[41.48,2.25]],
+    santcugat:[[41.41,1.96],[41.54,2.14]],
+    rubi:[[41.45,1.95],[41.56,2.08]]
+  };
+  commercialMap.fitBounds(bounds[scope]||bounds.all,{padding:[12,12]});
+}
+function openPostalPortfolio(cp){
+  showTab('leads');
+  const p=document.getElementById('fPostal');if(p)p.value=cp;
+  const globalRep=document.getElementById('globalRep')?.value||'';
+  const rep=document.getElementById('fRep');if(rep&&globalRep)rep.value=globalRep;
+  updatePostalHint();loadAdminLeads(true);
+}
+async function searchMapAddress(){
+  const input=document.getElementById('mapAddressQuery');
+  const box=document.getElementById('mapAddressResults');
+  const q=(input?.value||'').trim();
+  if(q.length<3){return}
+  box.classList.remove('hidden');box.innerHTML='<div class="map-search-loading">Buscando dirección…</div>';
+  try{
+    const data=await req('/address-resolve?q='+encodeURIComponent(q));
+    mapSearchResults=data.items||[];
+    box.innerHTML=mapSearchResults.length?mapSearchResults.map(function(x,i){
+      const sub=[x.postal_code,x.municipality,x.neighborhood||x.zone_short].filter(Boolean).join(' · ');
+      return '<button onclick="selectMapAddress('+i+')"><b>'+esc(x.display_name)+'</b><span>'+esc(sub)+'</span></button>';
+    }).join(''):'<div class="map-search-loading">No he encontrado esa dirección en la provincia de Barcelona.</div>';
+  }catch(ex){box.innerHTML='<div class="map-search-loading">'+esc(ex.message)+'</div>'}
+}
+function selectMapAddress(index){
+  const x=mapSearchResults[index];if(!x||!commercialMap)return;
+  const lat=Number(x.lat),lon=Number(x.lon);
+  if(mapAddressMarker){mapAddressMarker.remove()}
+  mapAddressMarker=L.marker([lat,lon]).addTo(commercialMap).bindPopup('<b>'+esc(x.display_name)+'</b><br>'+esc([x.postal_code,x.municipality,x.neighborhood||x.zone_short].filter(Boolean).join(' · '))).openPopup();
+  commercialMap.flyTo([lat,lon],15,{duration:.7});
+  document.getElementById('mapAddressResults').classList.add('hidden');
+  const layers=postalLayersByCp[String(x.postal_code||'')]||[];
+  layers.forEach(function(layer){layer.setStyle({weight:3,color:'#071b49'})});
 }
 
 function renderGlobalRep(){
