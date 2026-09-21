@@ -1,5 +1,9 @@
 import os
 import base64
+import json
+from functools import lru_cache
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 from datetime import datetime, timedelta, timezone, time
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -66,20 +70,65 @@ POSTAL_ZONE_MAP = {
     "08036": "l'Antiga Esquerra de l'Eixample",
     "08037": "el Camp d'en Grassot i Gràcia Nova · la Dreta de l'Eixample",
     "08038": "el Poble-sec · la Marina de Port · la Marina del Prat Vermell",
-    "08039": "Barcelona — zona postal especial",
+    "08039": "Port de Barcelona · zona litoral/portuària",
     "08040": "la Marina del Prat Vermell",
     "08041": "el Camp de l'Arpa del Clot · el Guinardó · Navas",
     "08042": "Can Peguera · Canyelles · la Guineueta · la Trinitat Nova · les Roquetes · Verdun",
+    "08070": "Correspondència oficial Correos/Telegràfs — codi especial",
+    "08071": "Organismes oficials — codi especial",
+    "08075": "Ciutat de la Justícia / Gran Via 111 — codi especial",
+    "08080": "Apartats particulars i llista — codi especial",
+    "08171": "Sant Cugat del Vallès — codi especial/no territorial",
+    "08172": "Sant Cugat del Vallès — zona postal 08172",
+    "08173": "Sant Cugat del Vallès — zona postal 08173",
+    "08174": "Sant Cugat del Vallès — zona postal 08174",
+    "08190": "Sant Cugat del Vallès — codi especial/institucional",
+    "08195": "Mira-sol · Sant Cugat del Vallès",
+    "08196": "Les Planes · Sant Cugat del Vallès",
+    "08197": "Valldoreix · Sant Cugat del Vallès",
+    "08198": "La Floresta · Vallpineda · Sant Cugat del Vallès",
+    "08191": "Rubí",
 }
+
+POSTAL_SPECIAL_CODES = {"08070","08071","08075","08080","08171","08190"}
+BARCELONA_TERRITORIAL_CODES = {f"080{i:02d}" for i in range(1,43)}
+SANT_CUGAT_TERRITORIAL_CODES = {"08172","08173","08174","08195","08196","08197","08198"}
+RUBI_TERRITORIAL_CODES = {"08191"}
+COVERAGE_POSTAL_CODES = BARCELONA_TERRITORIAL_CODES | SANT_CUGAT_TERRITORIAL_CODES | RUBI_TERRITORIAL_CODES
+
+def postal_municipality(postal_code: str):
+    cp=(postal_code or "").strip()
+    if cp in BARCELONA_TERRITORIAL_CODES or cp in {"08070","08071","08075","08080"}:
+        return "Barcelona"
+    if cp in SANT_CUGAT_TERRITORIAL_CODES or cp in {"08171","08190"}:
+        return "Sant Cugat del Vallès"
+    if cp in RUBI_TERRITORIAL_CODES:
+        return "Rubí"
+    return ""
 
 def postal_zone(postal_code: str):
     cp=(postal_code or "").strip()
     label=POSTAL_ZONE_MAP.get(cp)
+    municipality=postal_municipality(cp)
     if not label:
-        return {"postal_code":cp,"zone_label":"Fuera del directorio Barcelona","zone_short":"Fuera de Barcelona / sin zona"}
+        return {
+            "postal_code":cp,
+            "municipality":municipality or "Fuera del directorio",
+            "zone_label":"Fuera del directorio Barcelona · Sant Cugat · Rubí",
+            "zone_short":"Fuera del área objetivo / sin zona",
+            "is_special":False,
+            "is_coverage_code":False,
+        }
     parts=[p.strip() for p in label.split(" · ") if p.strip()]
     short=parts[0] if len(parts)==1 else (parts[0]+" · "+parts[1]+(f" +{len(parts)-2}" if len(parts)>2 else ""))
-    return {"postal_code":cp,"zone_label":label,"zone_short":short}
+    return {
+        "postal_code":cp,
+        "municipality":municipality,
+        "zone_label":label,
+        "zone_short":short,
+        "is_special":cp in POSTAL_SPECIAL_CODES,
+        "is_coverage_code":cp in COVERAGE_POSTAL_CODES,
+    }
 
 def madrid_day_bounds():
     madrid=ZoneInfo("Europe/Madrid")
@@ -87,6 +136,56 @@ def madrid_day_bounds():
     start=datetime.combine(now.date(),time.min,tzinfo=madrid).astimezone(timezone.utc)
     end=datetime.combine(now.date(),time.max,tzinfo=madrid).astimezone(timezone.utc)
     return start,end
+
+@lru_cache(maxsize=512)
+def geocode_target_address(query: str):
+    params=urlencode({
+        "format":"jsonv2",
+        "q":query,
+        "addressdetails":1,
+        "limit":8,
+        "countrycodes":"es",
+        "viewbox":"1.90,41.62,2.26,41.28",
+        "bounded":1,
+        "accept-language":"ca,es",
+    })
+    req=Request(
+        "https://nominatim.openstreetmap.org/search?"+params,
+        headers={"User-Agent":"RevifyCRM/1.0 (address resolver; admin use)"}
+    )
+    with urlopen(req,timeout=6) as response:
+        data=json.loads(response.read().decode("utf-8"))
+    out=[]
+    seen=set()
+    for item in data:
+        addr=item.get("address") or {}
+        cp=(addr.get("postcode") or "").strip()
+        municipality=(
+            addr.get("city") or addr.get("town") or addr.get("village") or
+            addr.get("municipality") or addr.get("county") or ""
+        )
+        normalized=municipality.lower().replace("á","a").replace("é","e").replace("í","i").replace("ó","o").replace("ú","u").replace("à","a").replace("è","e").replace("ò","o").replace("ï","i").replace("ü","u")
+        is_target=cp in POSTAL_ZONE_MAP or any(x in normalized for x in ["barcelona","sant cugat","rubi","rubí"])
+        if not is_target:
+            continue
+        key=(item.get("display_name",""),cp)
+        if key in seen:
+            continue
+        seen.add(key)
+        zi=postal_zone(cp)
+        neighborhood=addr.get("neighbourhood") or addr.get("suburb") or addr.get("quarter") or addr.get("city_district") or ""
+        out.append({
+            "display_name":item.get("display_name",""),
+            "postal_code":cp,
+            "municipality":zi["municipality"] or municipality,
+            "neighborhood":neighborhood,
+            "zone_label":zi["zone_label"],
+            "zone_short":zi["zone_short"],
+            "lat":item.get("lat"),
+            "lon":item.get("lon"),
+            "is_special":zi["is_special"],
+        })
+    return out
 
 def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin" and user.email.lower() != ADMIN_EMAIL:
