@@ -70,6 +70,15 @@ class Sale(Base):
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 Index('ix_sales_user_created', Sale.actor_user_id, Sale.created_at.desc())
 
+class InventoryMovement(Base):
+    __tablename__='inventory_movements'
+    id: Mapped[int]=mapped_column(primary_key=True)
+    actor_user_id: Mapped[int]=mapped_column(ForeignKey('users.id'), index=True)
+    quantity_delta: Mapped[int]=mapped_column(Integer)
+    notes: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+Index('ix_inventory_created', InventoryMovement.created_at.desc())
+
 class AuditLog(Base):
     __tablename__='audit_logs'
     id: Mapped[int]=mapped_column(primary_key=True)
