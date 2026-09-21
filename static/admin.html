@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="/static/admin.css">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-2015">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -24,7 +24,7 @@
       <div class="side-brand"><div class="logo">R</div><strong>Revify</strong><span>Admin</span></div>
       <nav>
         <button class="nav active" data-tab="dashboard" onclick="showTab('dashboard')">◫ Dashboard</button>
-        <button class="nav" data-tab="postal" onclick="showTab('postal')">⌖ Códigos postales</button>
+        <button class="nav" data-tab="postal" onclick="showTab('postal')">⌖ Zonas / CP</button>
         <button class="nav" data-tab="categories" onclick="showTab('categories')">◇ Categorías</button>
         <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
         <button class="nav" data-tab="leads" onclick="showTab('leads')">▣ Negocios</button>
@@ -61,6 +61,17 @@
           <article><span>Facturación / visita</span><b id="kRevenuePerVisit">0 €</b><small>Eficiencia comercial</small></article>
           <article><span>Usuarios activos</span><b id="kUsers">0</b><small>Admin + comerciales</small></article>
         </div>
+        <div class="attention-kpis">
+          <article><span>Deals abiertos</span><b id="kOpenDeals">0</b><small>Cartera todavía trabajable</small></article>
+          <article><span>Seguimientos hoy</span><b id="kFollowupsToday">0</b><small>Acciones previstas para hoy</small></article>
+          <article class="warn"><span>Seguimientos vencidos</span><b id="kOverdue">0</b><small>Necesitan acción comercial</small></article>
+          <article class="danger"><span>Sin tocar 7+ días</span><b id="kStale">0</b><small>Deals abiertos sin movimiento</small></article>
+        </div>
+
+        <section class="panel attention-panel">
+          <div class="panel-head"><div><h2>Oportunidades que requieren atención</h2><p>Seguimientos vencidos y deals abiertos sin actividad reciente.</p></div><button class="link" onclick="showTab('leads')">Abrir cartera</button></div>
+          <div id="attentionList" class="attention-list"></div>
+        </section>
 
         <div class="two-col">
           <section class="panel">
@@ -75,12 +86,12 @@
 
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Actividad y resultado del periodo seleccionado</p></div><button class="link" onclick="showTab('team')">Ver equipo completo</button></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>Comercial</th><th>Leads</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket</th><th>Facturación</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Comercial</th><th>Leads</th><th>Abiertos</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Vencidos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket</th><th>Facturación</th><th>Última actividad</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
         </section>
 
         <div class="two-col">
           <section class="panel">
-            <div class="panel-head"><div><h2>Top códigos postales</h2><p>Ordenados por facturación del periodo</p></div><button class="link" onclick="showTab('postal')">Ver todos</button></div>
+            <div class="panel-head"><div><h2>Top zonas</h2><p>CP + barrio/zona, ordenados por facturación del periodo</p></div><button class="link" onclick="showTab('postal')">Ver todos</button></div>
             <div id="postalTop" class="mini-ranking"></div>
           </section>
           <section class="panel">
@@ -92,8 +103,9 @@
 
       <section id="tab-postal" class="tab hidden">
         <section class="panel">
-          <div class="panel-head"><div><h2>Rendimiento por código postal</h2><p>Penetración, actividad, conversión y facturación zona por zona.</p></div><input id="postalSearch" class="small-search" placeholder="Buscar CP..." oninput="renderPostalTable()"></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>CP</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="postalTable"></tbody></table></div>
+          <div class="panel-head"><div><h2>Rendimiento por zona postal</h2><p>CP, barrio/zona asociada, actividad, conversión y facturación.</p></div><input id="postalSearch" class="small-search" placeholder="Buscar CP o barrio..." oninput="renderPostalTable()"></div>
+          <div class="postal-note">Un código postal puede abarcar más de un barrio. Revify muestra las zonas asociadas al CP y evita presentar una precisión falsa.</div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>CP</th><th>Barrio / zona asociada</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="postalTable"></tbody></table></div>
         </section>
       </section>
 
@@ -115,7 +127,7 @@
       <section id="tab-team" class="tab hidden">
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento y accesos</h2><p>Un CRM por usuario, una única base de datos para dirección.</p></div><button class="primary small" onclick="openCreateCommercial()">＋ Nuevo comercial</button></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Ticket</th><th>Facturación</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Abiertos</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Vencidos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Ticket</th><th>Facturación</th><th>Última actividad</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
         </section>
         <div id="credentialBox" class="credential hidden"></div>
       </section>
@@ -125,7 +137,7 @@
           <div class="panel-head"><div><h2>Detalle de todos los negocios</h2><p id="leadCountLabel">Cartera completa del equipo.</p></div></div>
           <div class="filters">
             <input id="fSearch" placeholder="Buscar negocio, dirección, contacto..." oninput="debouncedAdminLeads()">
-            <input id="fPostal" maxlength="5" placeholder="Código postal" oninput="debouncedAdminLeads()">
+            <div class="postal-filter"><input id="fPostal" maxlength="5" placeholder="Código postal" oninput="updatePostalHint();debouncedAdminLeads()"><small id="fPostalHint">Escribe un CP para ver su barrio/zona.</small></div>
             <select id="fRep" onchange="loadAdminLeads(true)"><option value="">Todos los comerciales</option></select>
             <select id="fStatus" onchange="loadAdminLeads(true)">
               <option value="">Todos los estados</option><option value="pending">Pendiente</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="won">Vendido</option><option value="lost">No interesado</option>
@@ -134,7 +146,7 @@
               <option value="">Todas las categorías</option><option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option><option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option><option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option>
             </select>
           </div>
-          <div class="table-wrap"><table class="ultra-wide"><thead><tr><th>Negocio</th><th>CP</th><th>Categoría / tipo</th><th>Comercial</th><th>Estado</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Ticket</th><th>Facturación</th><th>Contacto</th><th>Próxima acción</th><th>Actualizado</th></tr></thead><tbody id="businessTable"></tbody></table></div>
+          <div class="table-wrap"><table class="ultra-wide"><thead><tr><th>Negocio</th><th>CP</th><th>Barrio / zona</th><th>Categoría / tipo</th><th>Comercial</th><th>Estado</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Ticket</th><th>Facturación</th><th>Contacto</th><th>Próxima acción</th><th>Actualizado</th></tr></thead><tbody id="businessTable"></tbody></table></div>
           <button id="adminLoadMore" class="load-more hidden" onclick="loadAdminLeads(false)">Cargar 50 más</button>
         </section>
       </section>
@@ -182,6 +194,6 @@
     </div>
   </div>
 
-  <script src="/static/admin.js"></script>
+  <script src="/static/admin.js?v=20260921-2015"></script>
 </body>
 </html>
