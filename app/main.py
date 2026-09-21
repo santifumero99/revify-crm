@@ -1,6 +1,7 @@
 import os, json, base64
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
+from zoneinfo import ZoneInfo
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Header, Query, Request
 from fastapi.responses import FileResponse
@@ -23,7 +24,10 @@ def lead_out(x:Lead):
         'id':x.id,'name':x.name,'address':x.address or '','postal_code':x.postal_code,
         'business_type':x.business_type,'business_subtype':x.business_subtype or '',
         'owner_name':x.owner_name or '','phone':x.phone or '','status':x.status,
-        'next_action':x.next_action or '','created_at':x.created_at.isoformat(),
+        'next_action':x.next_action or '',
+        'follow_up_at':x.follow_up_at.isoformat() if x.follow_up_at else None,
+        'follow_up_at':x.follow_up_at.isoformat() if x.follow_up_at else None,
+        'created_at':x.created_at.isoformat(),
         'updated_at':x.updated_at.isoformat()
     }
 
@@ -65,6 +69,8 @@ def startup():
     with engine.begin() as conn:
         if engine.dialect.name=='postgresql':
             try:
+                conn.execute(text('ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ NULL'))
+                conn.execute(text('CREATE INDEX IF NOT EXISTS ix_leads_follow_up_at ON leads (follow_up_at)'))
                 conn.execute(text('CREATE EXTENSION IF NOT EXISTS pg_trgm'))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_leads_name_trgm ON leads USING gin (lower(name) gin_trgm_ops)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_leads_subtype_trgm ON leads USING gin (lower(coalesce(business_subtype,'')) gin_trgm_ops)"))
@@ -112,13 +118,38 @@ def metrics(user:User=Depends(current_user),db:Session=Depends(get_db)):
     demos=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type=='demo',Activity.created_at>=today)) or 0
     sales=db.scalar(select(func.count()).select_from(Sale).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
     revenue=db.scalar(select(func.coalesce(func.sum(Sale.total),0)).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
+    madrid=ZoneInfo('Europe/Madrid')
+    now_local=datetime.now(madrid)
+    day_start=datetime.combine(now_local.date(),time.min,tzinfo=madrid).astimezone(timezone.utc)
+    day_end=datetime.combine(now_local.date(),time.max,tzinfo=madrid).astimezone(timezone.utc)
+    followups=list(db.scalars(
+        select(Lead)
+        .where(
+            Lead.assigned_user_id==user.id,
+            Lead.status=='follow_up',
+            Lead.follow_up_at.is_not(None),
+            Lead.follow_up_at>=day_start,
+            Lead.follow_up_at<=day_end
+        )
+        .order_by(Lead.follow_up_at.asc())
+        .limit(8)
+    ).all())
     priority=db.scalar(
         select(Lead)
         .where(Lead.assigned_user_id==user.id,Lead.status.in_(['follow_up','owner_absent','pending','closed']))
-        .order_by(case((Lead.status=='follow_up',0),(Lead.status=='owner_absent',1),(Lead.status=='pending',2),else_=3),Lead.updated_at.desc())
+        .order_by(
+            case((Lead.status=='follow_up',0),(Lead.status=='owner_absent',1),(Lead.status=='pending',2),else_=3),
+            case((Lead.follow_up_at.is_(None),1),else_=0),
+            Lead.follow_up_at.asc(),
+            Lead.updated_at.desc()
+        )
         .limit(1)
     )
-    return {'visits':visits,'demos':demos,'sales':sales,'revenue':float(revenue),'priority_lead':lead_out(priority) if priority else None}
+    return {
+        'visits':visits,'demos':demos,'sales':sales,'revenue':float(revenue),
+        'priority_lead':lead_out(priority) if priority else None,
+        'followups_today':[lead_out(x) for x in followups]
+    }
 
 @app.get('/api/leads')
 def list_leads(search:str='',cursor:Optional[str]=None,limit:int=Query(50,ge=1,le=100),user:User=Depends(current_user),db:Session=Depends(get_db)):
@@ -171,7 +202,8 @@ def create_lead(data:LeadCreate,user:User=Depends(current_user),db:Session=Depen
         owner_name=data.owner_name.strip() or None,
         phone=data.phone.strip() or None,
         status=data.status,
-        next_action=next_action
+        next_action=next_action,
+        follow_up_at=data.follow_up_at if data.status=='follow_up' else None
     )
     db.add(x)
     db.flush()
@@ -264,6 +296,10 @@ def patch_lead(lead_id:int,data:LeadPatch,user:User=Depends(current_user),db:Ses
             existing_sale=sale_created
 
         x.status=data.status
+        if x.status=='follow_up':
+            x.follow_up_at=data.follow_up_at if data.follow_up_at is not None else x.follow_up_at
+        else:
+            x.follow_up_at=None
         if x.status=='won':
             x.next_action='Venta registrada'
         elif x.status=='lost':
@@ -279,13 +315,16 @@ def patch_lead(lead_id:int,data:LeadPatch,user:User=Depends(current_user),db:Ses
 
     if data.next_action is not None:
         x.next_action=data.next_action.strip()
+    if data.follow_up_at is not None and x.status=='follow_up':
+        x.follow_up_at=data.follow_up_at
 
     x.updated_at=utcnow()
     after={
         'name':x.name,'address':x.address or '','postal_code':x.postal_code,
         'business_type':x.business_type,'business_subtype':x.business_subtype or '',
         'owner_name':x.owner_name or '','phone':x.phone or '','status':x.status,
-        'next_action':x.next_action or ''
+        'next_action':x.next_action or '',
+        'follow_up_at':x.follow_up_at.isoformat() if x.follow_up_at else None
     }
     audit(db,user.id,'lead_updated',x.id,{'before':before,'after':after})
     db.commit()
