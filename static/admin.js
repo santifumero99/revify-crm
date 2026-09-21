@@ -289,6 +289,7 @@ async function loadAdminLeads(reset){
   const cat=document.getElementById('fCategory').value;
   if(search)p.set('search',search);if(postal)p.set('postal_code',postal);if(rep)p.set('assigned_user_id',rep);if(status)p.set('status',status);if(cat)p.set('business_type',cat);if(!reset&&adminLeadCursor)p.set('cursor',adminLeadCursor);
   const data=await req('/admin/leads?'+p.toString());adminLeadCursor=data.next_cursor||null;
+  if(reset)visibleBusinesses=data.items.slice();else visibleBusinesses=visibleBusinesses.concat(data.items);
   document.getElementById('leadCountLabel').textContent=num(data.total_filtered)+' negocios con los filtros actuales.';
   const html=data.items.map(function(x){
     const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'—');
@@ -297,6 +298,30 @@ async function loadAdminLeads(reset){
   const body=document.getElementById('businessTable');
   if(reset)body.innerHTML=html||'<tr><td colspan="15">No hay negocios con estos filtros.</td></tr>';else body.insertAdjacentHTML('beforeend',html);
   document.getElementById('adminLoadMore').classList.toggle('hidden',!adminLeadCursor);
+}
+function clearLeadFilters(){
+  document.getElementById('fSearch').value='';
+  document.getElementById('fPostal').value='';
+  document.getElementById('fStatus').value='';
+  document.getElementById('fCategory').value='';
+  document.getElementById('fRep').value=document.getElementById('globalRep')?.value||'';
+  updatePostalHint();
+  loadAdminLeads(true);
+}
+function csvCell(v){
+  const s=String(v==null?'':v).replaceAll('"','""');
+  return '"'+s+'"';
+}
+function exportVisibleBusinesses(){
+  if(!visibleBusinesses.length){alert('No hay negocios visibles para exportar.');return}
+  const head=['Negocio','Dirección','CP','Barrio / zona','Categoría','Tipo','Comercial','Estado','Visitas','Demos','Ventas','Unidades','Ticket','Facturación','Contacto','Teléfono','Próxima acción','Actualizado'];
+  const rows=visibleBusinesses.map(function(x){
+    const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'');
+    return [x.name,x.address,x.postal_code,x.zone_label||x.zone_short,x.business_type,x.business_subtype,x.rep_email,statusLabel(x.status),x.visits,x.demos,x.sales,x.units,x.avg_ticket,x.revenue,x.owner_name,x.phone,next,dateText(x.updated_at)];
+  });
+  const csv='\uFEFF'+[head].concat(rows).map(function(r){return r.map(csvCell).join(';')}).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revify-negocios-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},500);
 }
 
 function openCreateCommercial(){
