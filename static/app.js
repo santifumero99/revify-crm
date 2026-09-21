@@ -25,6 +25,19 @@ function dateTime(v){if(!v)return '—';return new Intl.DateTimeFormat('es-ES',{
 function localInputValue(v){if(!v)return '';const d=new Date(v);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
 function followUpLabel(v){return v?`Seguimiento: ${dateTime(v)}`:'Seguimiento pendiente'}
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function norm(v){return String(v||'').trim().toLowerCase().replace(/\s+/g,' ')}
+function normPhone(v){return String(v||'').replace(/\D/g,'')}
+async function confirmPossibleDuplicate(payload){
+  const data=await api('/leads?search='+encodeURIComponent(payload.name)+'&limit=20');
+  const duplicate=(data.items||[]).find(x=>{
+    const sameName=norm(x.name)===norm(payload.name);
+    const samePhone=normPhone(payload.phone)&&normPhone(x.phone)===normPhone(payload.phone);
+    const samePlace=payload.address&&norm(x.address)===norm(payload.address)&&x.postal_code===payload.postal_code;
+    return samePhone||(sameName&&samePlace);
+  });
+  if(!duplicate)return true;
+  return confirm(`Posible duplicado: ${duplicate.name} ya existe en el CRM.\n\n¿Quieres crear igualmente este deal?`);
+}
 function hideScreens(){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'))}
 function setNav(name){document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.nav===name))}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(()=>t.classList.remove('show'),1800)}
@@ -319,6 +332,8 @@ async function saveLead(e){
     payload.sale_delivered=document.getElementById('newDelivered').value==='true';
   }
   try{
+    const proceed=await confirmPossibleDuplicate(payload);
+    if(!proceed){toast('Alta cancelada');return}
     await api('/leads',{method:'POST',body:JSON.stringify(payload)});
     e.target.reset();toggleCreateSaleFields();calcCreateSaleTotal();showLeads();
     toast(status==='won'?'Deal y venta registrados':'Deal registrado');
