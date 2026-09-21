@@ -311,8 +311,8 @@ function renderDashboard(){
   document.getElementById('kLeads').textContent=num(s.leads_total);
   document.getElementById('kNewLeads').textContent=num(s.new_leads)+' nuevos'+deltaText('new_leads');
   document.getElementById('kOpenDeals').textContent=num(s.open_deals);
-  document.getElementById('kVisits').textContent=num(s.visits);
-  document.getElementById('kSalePerVisit').textContent=pct(s.sale_per_visit_pct)+' venta / visita'+(deltaText('visits')||'');
+  document.getElementById('kVisits').textContent=num(s.visited_businesses||0);
+  document.getElementById('kSalePerVisit').textContent=pct(s.sale_per_visit_pct)+' venta / negocio visitado';
   document.getElementById('kSales').textContent=num(s.sales);
   document.getElementById('kAvgTicket').textContent='Ticket '+money(s.avg_ticket)+(deltaText('sales')||'');
   document.getElementById('kRevenue').textContent=money(s.revenue);
@@ -417,7 +417,7 @@ function renderCategoryTable(){
   }).join('')||'<tr><td colspan="9">Sin datos.</td></tr>';
 }
 function repRow(r){
-  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td></tr>';
+  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visited_businesses||0)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td></tr>';
 }
 function renderTeam(){
   document.getElementById('teamTable').innerHTML=(analytics.reps||[]).map(function(r){
@@ -425,7 +425,7 @@ function renderTeam(){
     if(r.role!=='admin'){
       buttons='<button data-email="'+esc(r.email)+'" onclick="resetRepPassword('+r.id+',this.dataset.email)">Contraseña</button><button class="'+(r.is_active?'danger':'')+'" onclick="toggleRep('+r.id+','+(!r.is_active)+')">'+(r.is_active?'Pausar':'Activar')+'</button>';
     }
-    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td><div class="actions">'+buttons+'</div></td></tr>';
+    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visited_businesses||0)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td><div class="actions">'+buttons+'</div></td></tr>';
   }).join('');
 }
 function renderActivity(){
