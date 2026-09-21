@@ -14,7 +14,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from .auth import current_user, get_db, hash_password, verify_password
-from .db import User, Lead, Activity, Sale, AuditLog, utcnow
+from .db import User, Lead, Activity, Sale, AuditLog, InventoryMovement, utcnow
 
 router = APIRouter()
 
@@ -227,6 +227,10 @@ class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(min_length=10, max_length=200)
 
+class InventoryMovementIn(BaseModel):
+    quantity_delta: int = Field(ge=-100000, le=100000)
+    notes: str = Field(default="", max_length=500)
+
 def _encode_cursor(x: Lead) -> str:
     raw = f"{int(x.updated_at.timestamp()*1000000)}:{x.id}".encode()
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
@@ -349,6 +353,36 @@ def address_resolve(
         raise HTTPException(status_code=502, detail="No se pudo consultar el servicio de direcciones")
     return {"query":query,"items":items}
 
+
+@router.post("/api/admin/inventory/movements")
+def add_inventory_movement(
+    data: InventoryMovementIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    if data.quantity_delta == 0:
+        raise HTTPException(status_code=400, detail="La cantidad no puede ser 0")
+    movement=InventoryMovement(
+        actor_user_id=admin.id,
+        quantity_delta=data.quantity_delta,
+        notes=data.notes.strip() or None,
+    )
+    db.add(movement)
+    db.add(AuditLog(
+        actor_user_id=admin.id,
+        lead_id=None,
+        event_type="inventory_adjusted",
+        payload=json.dumps({"quantity_delta":data.quantity_delta,"notes":data.notes.strip()},ensure_ascii=False),
+    ))
+    db.commit()
+    total_adjustments=int(db.scalar(select(func.coalesce(func.sum(InventoryMovement.quantity_delta),0))) or 0)
+    sold_units=int(db.scalar(select(func.coalesce(func.sum(Sale.quantity),0))) or 0)
+    return {
+        "ok":True,
+        "stock_available":total_adjustments-sold_units,
+        "stock_movements_net":total_adjustments,
+        "sold_units_total":sold_units,
+    }
 
 @router.get("/api/admin/analytics")
 def admin_analytics(
@@ -904,6 +938,14 @@ def admin_analytics(
         })
     insights=insights[:6]
 
+    inventory_net=int(db.scalar(select(func.coalesce(func.sum(InventoryMovement.quantity_delta),0))) or 0)
+    sold_units_total=int(db.scalar(select(func.coalesce(func.sum(Sale.quantity),0))) or 0)
+    stock_available=inventory_net-sold_units_total
+    inventory_added=int(db.scalar(
+        select(func.coalesce(func.sum(InventoryMovement.quantity_delta),0))
+        .where(InventoryMovement.quantity_delta>0)
+    ) or 0)
+
     return {
         "period": {"days": days, "start": start.isoformat() if start else None},
         "segment": {"postal_code": postal_code or None,"assigned_user_id":assigned_user_id},
@@ -940,6 +982,10 @@ def admin_analytics(
             "territory_coverage_pct":territory_coverage_pct,
             "covered_postal_codes":len(covered_cps),
             "territory_total_postal_codes":territory_total,
+            "stock_available":stock_available,
+            "stock_units_added":inventory_added,
+            "stock_adjustment_net":inventory_net,
+            "sold_units_total":sold_units_total,
         },
         "comparison":comparison,
         "pipeline_aging":aging,
