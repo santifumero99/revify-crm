@@ -223,7 +223,7 @@ def admin_analytics(
     activity_period_q = (
         select(
             func.count(Activity.id),
-            func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+            func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
             func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
             func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
         )
@@ -280,7 +280,7 @@ def admin_analytics(
         aq = (
             select(
                 dim,
-                func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+                func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
                 func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
                 func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
             )
@@ -310,16 +310,88 @@ def admin_analytics(
         return _merge_breakdown(base_rows, activity_rows, sale_rows, key_name)
 
     postal_codes = breakdown(Lead.postal_code, "postal_code")
+    for row in postal_codes:
+        row.update(postal_zone(row["postal_code"]))
     categories = breakdown(Lead.business_type, "category")
+
+    now=utcnow()
+    day_start,day_end=madrid_day_bounds()
+    alert_base=[Lead.status.in_(["pending","owner_absent","closed","follow_up"])]
+    if postal_cond is not None:
+        alert_base.append(postal_cond)
+    open_deals=db.scalar(select(func.count()).select_from(Lead).where(*alert_base)) or 0
+    followups_today=db.scalar(select(func.count()).select_from(Lead).where(
+        *alert_base,
+        Lead.status=="follow_up",
+        Lead.follow_up_at.is_not(None),
+        Lead.follow_up_at>=day_start,
+        Lead.follow_up_at<=day_end
+    )) or 0
+    overdue_followups=db.scalar(select(func.count()).select_from(Lead).where(
+        *alert_base,
+        Lead.status=="follow_up",
+        Lead.follow_up_at.is_not(None),
+        Lead.follow_up_at<now
+    )) or 0
+    stale_cutoff=now-timedelta(days=7)
+    stale_condition=or_(
+        (Lead.status.in_(["pending","owner_absent","closed"])) & (Lead.updated_at<stale_cutoff),
+        (Lead.status=="follow_up") & (Lead.follow_up_at.is_(None)) & (Lead.updated_at<stale_cutoff)
+    )
+    stale_q=select(func.count()).select_from(Lead).where(stale_condition)
+    if postal_cond is not None:
+        stale_q=stale_q.where(postal_cond)
+    stale_active_leads=db.scalar(stale_q) or 0
+
+    attention_q=(
+        select(Lead,User.email)
+        .join(User,User.id==Lead.assigned_user_id)
+        .where(or_(
+            (Lead.status=="follow_up") & (Lead.follow_up_at.is_not(None)) & (Lead.follow_up_at<now),
+            stale_condition
+        ))
+    )
+    if postal_cond is not None:
+        attention_q=attention_q.where(postal_cond)
+    attention_rows=db.execute(
+        attention_q.order_by(
+            case(((Lead.status=="follow_up") & (Lead.follow_up_at.is_not(None)) & (Lead.follow_up_at<now),0),else_=1),
+            Lead.follow_up_at.asc().nulls_last(),
+            Lead.updated_at.asc()
+        ).limit(20)
+    ).all()
+    attention=[]
+    for lead,email in attention_rows:
+        overdue=lead.status=="follow_up" and lead.follow_up_at is not None and lead.follow_up_at<now
+        zi=postal_zone(lead.postal_code)
+        attention.append({
+            "id":lead.id,
+            "name":lead.name,
+            "postal_code":lead.postal_code,
+            "zone_short":zi["zone_short"],
+            "rep_email":email,
+            "status":lead.status,
+            "reason":"Seguimiento vencido" if overdue else "Sin tocar 7+ días",
+            "follow_up_at":lead.follow_up_at.isoformat() if lead.follow_up_at else None,
+            "updated_at":lead.updated_at.isoformat()
+        })
 
     users = list(db.scalars(select(User).order_by(User.created_at.asc())).all())
     reps = []
     for u in users:
         leads_q = select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id)
         won_rep_q = select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id, Lead.status == "won")
+        open_rep_q = select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id,Lead.status.in_(["pending","owner_absent","closed","follow_up"]))
+        overdue_rep_q = select(func.count()).select_from(Lead).where(
+            Lead.assigned_user_id == u.id,
+            Lead.status=="follow_up",
+            Lead.follow_up_at.is_not(None),
+            Lead.follow_up_at<now
+        )
+        last_activity_q=select(func.max(Activity.created_at)).where(Activity.actor_user_id==u.id)
         aq = (
             select(
-                func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+                func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
                 func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
                 func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
             )
@@ -338,14 +410,20 @@ def admin_analytics(
         if postal_cond is not None:
             leads_q = leads_q.where(postal_cond)
             won_rep_q = won_rep_q.where(postal_cond)
+            open_rep_q = open_rep_q.where(postal_cond)
+            overdue_rep_q = overdue_rep_q.where(postal_cond)
             aq = aq.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
             sq = sq.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
+            last_activity_q = last_activity_q.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
         if start:
             aq = aq.where(Activity.created_at >= start)
             sq = sq.where(Sale.created_at >= start)
 
         leads = db.scalar(leads_q) or 0
         won = db.scalar(won_rep_q) or 0
+        open_rep = db.scalar(open_rep_q) or 0
+        overdue_rep = db.scalar(overdue_rep_q) or 0
+        last_activity = db.scalar(last_activity_q)
         ar = db.execute(aq).one()
         sr = db.execute(sq).one()
         rep_sales = int(sr[0] or 0)
@@ -359,6 +437,9 @@ def admin_analytics(
             "is_active": u.is_active,
             "leads": int(leads),
             "won": int(won),
+            "open_leads":int(open_rep),
+            "overdue_followups":int(overdue_rep),
+            "last_activity_at":last_activity.isoformat() if last_activity else None,
             "visits": rep_visits,
             "demos": int(ar[1] or 0),
             "followups": int(ar[2] or 0),
@@ -379,7 +460,7 @@ def admin_analytics(
     activity_daily_q = (
         select(
             func.date(Activity.created_at),
-            func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+            func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
             func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
         )
         .select_from(Activity)
@@ -434,8 +515,13 @@ def admin_analytics(
         "period": {"days": days, "start": start.isoformat() if start else None},
         "segment": {"postal_code": postal_code or None},
         "available_postal_codes": all_postal_codes,
+        "postal_directory":[postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())],
         "summary": {
             "active_users": int(active_users),
+            "open_deals":int(open_deals),
+            "followups_today":int(followups_today),
+            "overdue_followups":int(overdue_followups),
+            "stale_active_leads":int(stale_active_leads),
             "leads_total": int(lead_count),
             "won_total": int(won_leads),
             "portfolio_conversion_pct": round((won_leads / lead_count * 100), 1) if lead_count else 0,
@@ -457,6 +543,7 @@ def admin_analytics(
         "categories": categories,
         "reps": reps,
         "daily": list(daily.values()),
+        "attention":attention,
         "recent": recent,
     }
 
@@ -557,7 +644,7 @@ def admin_leads(
         for lead_id, v, d in db.execute(
             select(
                 Activity.lead_id,
-                func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+                func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
                 func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
             )
             .where(Activity.lead_id.in_(ids))
@@ -583,12 +670,15 @@ def admin_leads(
             "name": x.name,
             "address": x.address or "",
             "postal_code": x.postal_code,
+            "zone_label": postal_zone(x.postal_code)["zone_label"],
+            "zone_short": postal_zone(x.postal_code)["zone_short"],
             "business_type": x.business_type,
             "business_subtype": x.business_subtype or "",
             "owner_name": x.owner_name or "",
             "phone": x.phone or "",
             "status": x.status,
             "next_action": x.next_action or "",
+            "follow_up_at":x.follow_up_at.isoformat() if x.follow_up_at else None,
             "assigned_user_id": x.assigned_user_id,
             "rep_email": emails.get(x.assigned_user_id, ""),
             "created_at": x.created_at.isoformat(),
