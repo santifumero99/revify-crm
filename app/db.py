@@ -40,6 +40,7 @@ class Lead(Base):
     phone: Mapped[Optional[str]]=mapped_column(String(60), nullable=True)
     status: Mapped[str]=mapped_column(String(30), index=True, default='pending')
     next_action: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
+    follow_up_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 Index('ix_leads_user_updated', Lead.assigned_user_id, Lead.updated_at.desc(), Lead.id.desc())
