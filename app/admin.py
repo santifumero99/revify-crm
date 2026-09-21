@@ -426,6 +426,80 @@ def admin_analytics(
         stale_q=stale_q.where(rep_cond)
     stale_active_leads=db.scalar(stale_q) or 0
 
+    open_followup_filters=[
+        Lead.status=="follow_up"
+    ]
+    if postal_cond is not None:
+        open_followup_filters.append(postal_cond)
+    if rep_cond is not None:
+        open_followup_filters.append(rep_cond)
+    open_followups=db.scalar(select(func.count()).select_from(Lead).where(*open_followup_filters)) or 0
+    scheduled_followups=db.scalar(select(func.count()).select_from(Lead).where(
+        *open_followup_filters,
+        Lead.follow_up_at.is_not(None)
+    )) or 0
+    followup_scheduled_pct=round((scheduled_followups/open_followups*100),1) if open_followups else 0
+    followup_overdue_pct=round((overdue_followups/scheduled_followups*100),1) if scheduled_followups else 0
+
+    open_updated=list(db.scalars(
+        select(Lead.updated_at).where(*alert_base)
+    ).all())
+    aging={"0_2":0,"3_7":0,"8_14":0,"15_plus":0}
+    age_days=[]
+    for dt in open_updated:
+        d=max(0,(now-dt).days)
+        age_days.append(d)
+        if d<=2:
+            aging["0_2"]+=1
+        elif d<=7:
+            aging["3_7"]+=1
+        elif d<=14:
+            aging["8_14"]+=1
+        else:
+            aging["15_plus"]+=1
+    avg_open_age_days=round(sum(age_days)/len(age_days),1) if age_days else 0
+
+    decided_filters=[Lead.status.in_(["won","lost"])]
+    if postal_cond is not None:
+        decided_filters.append(postal_cond)
+    if rep_cond is not None:
+        decided_filters.append(rep_cond)
+    decided_rows=db.execute(
+        select(
+            func.sum(case((Lead.status=="won",1),else_=0)),
+            func.sum(case((Lead.status=="lost",1),else_=0))
+        ).where(*decided_filters)
+    ).one()
+    decided_won=int(decided_rows[0] or 0)
+    decided_lost=int(decided_rows[1] or 0)
+    decided_total=decided_won+decided_lost
+    decision_win_rate_pct=round((decided_won/decided_total*100),1) if decided_total else 0
+
+    sale_cycle_q=select(Sale.created_at,Lead.created_at).join(Lead,Lead.id==Sale.lead_id)
+    if postal_cond is not None:
+        sale_cycle_q=sale_cycle_q.where(postal_cond)
+    if rep_cond is not None:
+        sale_cycle_q=sale_cycle_q.where(rep_cond)
+    if start:
+        sale_cycle_q=sale_cycle_q.where(Sale.created_at>=start)
+    sale_cycles=[
+        max(0,(sale_at-lead_at).total_seconds()/86400)
+        for sale_at,lead_at in db.execute(sale_cycle_q).all()
+        if sale_at and lead_at
+    ]
+    avg_days_to_sale=round(sum(sale_cycles)/len(sale_cycles),1) if sale_cycles else 0
+
+    coverage_q=select(Lead.postal_code).where(Lead.postal_code.in_(list(POSTAL_ZONE_MAP.keys())))
+    if rep_cond is not None:
+        coverage_q=coverage_q.where(rep_cond)
+    covered_cps=set(db.scalars(coverage_q.distinct()).all())
+    territory_total=len(POSTAL_ZONE_MAP)
+    territory_coverage_pct=round((len(covered_cps)/territory_total*100),1) if territory_total else 0
+    whitespace=[
+        postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())
+        if cp not in covered_cps
+    ]
+
     attention_q=(
         select(Lead,User.email)
         .join(User,User.id==Lead.assigned_user_id)
