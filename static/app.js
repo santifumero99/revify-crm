@@ -22,6 +22,8 @@ const activityMeta={visit:'Visita',demo:'Demo',follow_up:'Seguimiento',owner_abs
 
 function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(Number(n||0))}
 function dateTime(v){if(!v)return '—';return new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(v))}
+function localInputValue(v){if(!v)return '';const d=new Date(v);const p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`}
+function followUpLabel(v){return v?`Seguimiento: ${dateTime(v)}`:'Seguimiento pendiente'}
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function hideScreens(){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'))}
 function setNav(name){document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.nav===name))}
@@ -81,6 +83,7 @@ async function loadDashboard(){
     document.getElementById('ring-pct').textContent=pct+'%';
     document.getElementById('progress-text').textContent=m.sales+' de 10 ventas';
     priorityLead=m.priority_lead||null;
+    renderTodayFollowups(m.followups_today||[]);
     const name=document.getElementById('priority-name');
     const address=document.getElementById('priority-address');
     const status=document.getElementById('priority-status');
@@ -94,6 +97,18 @@ async function loadDashboard(){
       name.textContent='Sin tareas pendientes';address.textContent='Da de alta tu primer negocio';status.textContent='Todo al día';status.className='status-pill pending';avatar.textContent='✓';
     }
   }catch(err){toast(err.message)}
+}
+function renderTodayFollowups(items){
+  const count=document.getElementById('followupsCount');
+  const box=document.getElementById('followupsToday');
+  if(count)count.textContent=items.length;
+  if(!box)return;
+  box.innerHTML=items.length?items.map(x=>`<button class="followup-row" onclick="openLead(${x.id})"><span><b>${escapeHtml(x.name)}</b><small>${dateTime(x.follow_up_at)}</small></span><span>›</span></button>`).join(''):'<div class="followup-empty">No tienes seguimientos programados para hoy.</div>';
+}
+function mapPriorityLead(){
+  if(!priorityLead?.address){toast('Este negocio no tiene dirección');return}
+  const q=[priorityLead.address,priorityLead.postal_code].filter(Boolean).join(', ');
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q),'_blank','noopener');
 }
 
 function handleLeadSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(()=>loadLeads(true),180)}
@@ -116,7 +131,7 @@ function renderLeads(summary={}){
   document.getElementById('sumActive').textContent=summary.active??0;
   document.getElementById('sumLost').textContent=summary.lost??0;
   document.getElementById('sumWon').textContent=summary.won??0;
-  document.getElementById('leadList').innerHTML=leads.map(x=>`<button class="lead-row" onclick="openLead(${x.id})"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><span><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.business_type||'Sin categoría')}${x.business_subtype?` · ${escapeHtml(x.business_subtype)}`:''} · ${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</small><small>${x.status==='won'?'Venta cerrada':x.status==='lost'?'No terminó en venta':escapeHtml(x.next_action||'En curso')}</small><small class="record-time">Registrado: ${dateTime(x.created_at)}</small></span><span class="lead-right">${pill(x.status)}<em>Ver ficha ›</em></span></button>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:14px;text-align:center">No hay resultados.</div>';
+  document.getElementById('leadList').innerHTML=leads.map(x=>`<button class="lead-row" onclick="openLead(${x.id})"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><span><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.business_type||'Sin categoría')}${x.business_subtype?` · ${escapeHtml(x.business_subtype)}`:''} · ${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</small><small>${x.status==='won'?'Venta cerrada':x.status==='lost'?'No terminó en venta':x.status==='follow_up'?escapeHtml(followUpLabel(x.follow_up_at)):escapeHtml(x.next_action||'En curso')}</small><small class="record-time">Registrado: ${dateTime(x.created_at)}</small></span><span class="lead-right">${pill(x.status)}<em>Ver ficha ›</em></span></button>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:14px;text-align:center">No hay resultados.</div>';
   const more=document.getElementById('loadMoreLeads');more.style.display=nextCursor?'block':'none';
 }
 
@@ -128,7 +143,7 @@ async function openLead(id){
     const editable=x.status!=='won';
     const quick=`${x.phone?`<button onclick="callCurrentLead()">Llamar</button>`:''}${x.address?`<button onclick="mapCurrentLead()">Maps</button>`:''}`;
     const history=(h.items||[]).map(a=>`<div class="activity-row"><div><b>${escapeHtml(activityMeta[a.activity_type]||a.activity_type)}</b><small>${dateTime(a.created_at)}</small></div><p>${escapeHtml(a.notes||'Sin nota')}</p></div>`).join('')||'<div class="activity-empty">Todavía no hay visitas registradas.</div>';
-    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div><div><span>ÚLTIMA ACTUALIZACIÓN</span><b>${dateTime(x.updated_at)}</b></div></div><div class="detail-actions">${editable?`<button class="blue" onclick="editLead(${x.id})">Editar deal</button><button onclick="showVisitForm(${x.id})">Nueva visita</button>`:'<button onclick="editLead(${x.id})">Editar datos</button><button onclick="showSales()">Ver venta</button>'}${quick}</div><div id="visitPanel"></div></div><div class="history-card"><div class="history-head"><b>Historial de actividad</b><span>${(h.items||[]).length}</span></div>${history}</div>`;
+    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div>${x.status==='follow_up'?`<div><span>PRÓXIMO SEGUIMIENTO</span><b>${dateTime(x.follow_up_at)}</b></div>`:''}<div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div><div><span>ÚLTIMA ACTUALIZACIÓN</span><b>${dateTime(x.updated_at)}</b></div></div><div class="detail-actions">${editable?`<button class="blue" onclick="editLead(${x.id})">Editar deal</button><button onclick="showVisitForm(${x.id})">Nueva visita</button>`:'<button onclick="editLead(${x.id})">Editar datos</button><button onclick="showSales()">Ver venta</button>'}${quick}</div><div id="visitPanel"></div></div><div class="history-card"><div class="history-head"><b>Historial de actividad</b><span>${(h.items||[]).length}</span></div>${history}</div>`;
   }catch(err){toast(err.message)}
 }
 
