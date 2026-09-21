@@ -78,13 +78,11 @@ function showTab(name){
     categories:['Categorías','Rendimiento por tipo de comercio'],
     team:['Comerciales','Actividad, resultado y accesos'],
     leads:['Negocios','Detalle negocio a negocio'],
-    activity:['Actividad','Últimos movimientos registrados'],
     security:['Seguridad','Tu acceso de administrador']
   };
   document.getElementById('pageTitle').textContent=titles[name][0];
   document.getElementById('pageSubtitle').textContent=titles[name][1];
   if(name==='leads')loadAdminLeads(true);
-  if(name==='map')setTimeout(function(){initCommercialMap()},30);
 }
 
 async function loadEverything(){await loadAnalytics();await loadAdminLeads(true)}
@@ -101,8 +99,7 @@ async function loadAnalytics(){
   renderGlobalRep();
   renderPostalSegment();
   updatePostalHint();
-  renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();renderTerritory();
-  if(document.getElementById('tab-map')&&!document.getElementById('tab-map').classList.contains('hidden'))setTimeout(function(){initCommercialMap(true)},20);
+  renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderRepFilters();renderTerritory();
   if(document.getElementById('tab-leads')&&!document.getElementById('tab-leads').classList.contains('hidden'))loadAdminLeads(true);
 }
 
@@ -400,7 +397,7 @@ function metricCells(x){
 function renderPostalTable(){
   const q=(document.getElementById('postalSearch')?document.getElementById('postalSearch').value:'').trim().toLowerCase();
   const rows=(analytics.postal_codes||[]).filter(function(x){return !q||String(x.postal_code).toLowerCase().includes(q)||String(x.zone_label||'').toLowerCase().includes(q)});
-  document.getElementById('postalTable').innerHTML=rows.map(function(x){return '<tr><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td>'+metricCells(x)+'</tr>'}).join('')||'<tr><td colspan="14">Sin datos.</td></tr>';
+  document.getElementById('postalTable').innerHTML=rows.map(function(x){return '<tr><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td>'+metricCells(x)+'</tr>'}).join('')||'<tr><td colspan="12">Sin datos.</td></tr>';
 }
 function renderCategoryTable(){
   const q=(document.getElementById('categorySearch')?document.getElementById('categorySearch').value:'').trim().toLowerCase();
