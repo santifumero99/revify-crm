@@ -18,7 +18,7 @@ const statusMeta={
 };
 const paymentMeta={cash:'Efectivo',card:'Tarjeta',bizum:'Bizum',transfer:'Transferencia',other:'Otro'};
 
-function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(Number(n||0))}
+function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(Number(n||0))}\nfunction dateTime(v){if(!v)return '—';return new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(v))}
 function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 function hideScreens(){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'))}
 function setNav(name){document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.nav===name))}
@@ -85,10 +85,10 @@ async function loadDashboard(){
     if(priorityLead){
       name.textContent=priorityLead.name;
       address.textContent=(priorityLead.address||'Sin dirección')+(priorityLead.postal_code?' · '+priorityLead.postal_code:'');
-      status.textContent=(statusMeta[priorityLead.status]||statusMeta.pending)[0];
+      const sm=statusMeta[priorityLead.status]||statusMeta.pending;status.textContent=sm[0];status.className='status-pill '+sm[1];
       avatar.textContent=priorityLead.name.charAt(0).toUpperCase();
     }else{
-      name.textContent='Sin tareas pendientes';address.textContent='Da de alta tu primer negocio';status.textContent='Todo al día';avatar.textContent='✓';
+      name.textContent='Sin tareas pendientes';address.textContent='Da de alta tu primer negocio';status.textContent='Todo al día';status.className='status-pill pending';avatar.textContent='✓';
     }
   }catch(err){toast(err.message)}
 }
@@ -113,7 +113,7 @@ function renderLeads(summary={}){
   document.getElementById('sumActive').textContent=summary.active??0;
   document.getElementById('sumLost').textContent=summary.lost??0;
   document.getElementById('sumWon').textContent=summary.won??0;
-  document.getElementById('leadList').innerHTML=leads.map(x=>`<button class="lead-row" onclick="openLead(${x.id})"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><span><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.business_type||'Sin categoría')}${x.business_subtype?` · ${escapeHtml(x.business_subtype)}`:''} · ${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</small><small>${x.status==='won'?'Venta cerrada':x.status==='lost'?'No terminó en venta':escapeHtml(x.next_action||'En curso')}</small></span><span class="lead-right">${pill(x.status)}<em>Ver ficha ›</em></span></button>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:14px;text-align:center">No hay resultados.</div>';
+  document.getElementById('leadList').innerHTML=leads.map(x=>`<button class="lead-row" onclick="openLead(${x.id})"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><span><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.business_type||'Sin categoría')}${x.business_subtype?` · ${escapeHtml(x.business_subtype)}`:''} · ${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</small><small>${x.status==='won'?'Venta cerrada':x.status==='lost'?'No terminó en venta':escapeHtml(x.next_action||'En curso')}</small><small class="record-time">Registrado: ${dateTime(x.created_at)}</small></span><span class="lead-right">${pill(x.status)}<em>Ver ficha ›</em></span></button>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:14px;text-align:center">No hay resultados.</div>';
   const more=document.getElementById('loadMoreLeads');more.style.display=nextCursor?'block':'none';
 }
 
@@ -122,7 +122,7 @@ async function openLead(id){
     const x=await api('/leads/'+id);currentLeadId=id;
     hideScreens();showAppNav();document.getElementById('screen-lead-detail').classList.add('active');setNav('leads');
     const editable=x.status!=='won';
-    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div></div><div class="detail-actions">${editable?`<button onclick="cycleStatus(${x.id},'${x.status}')">Actualizar estado</button><button onclick="registerActivity(${x.id})">Registrar visita</button>`:'<button onclick="showSales()">Ver venta</button>'}</div></div>`;
+    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div></div><div class="detail-actions">${editable?`<button onclick="cycleStatus(${x.id},'${x.status}')">Actualizar estado</button><button onclick="registerActivity(${x.id})">Registrar visita</button>`:'<button onclick="showSales()">Ver venta</button>'}</div></div>`;
   }catch(err){toast(err.message)}
 }
 
@@ -182,7 +182,7 @@ async function loadSales(){
     document.getElementById('salesUnits').textContent=s.units||0;
     document.getElementById('salesAvg').textContent=money(s.avg_ticket||0);
     document.getElementById('salesRevenue').textContent=money(s.revenue||0);
-    document.getElementById('salesList').innerHTML=(data.items||[]).map(x=>`<div class="lead-row"><span class="lead-avatar">${escapeHtml((x.lead_name||'V').charAt(0))}</span><span><b>${escapeHtml(x.lead_name||'Venta')}</b><small>${x.quantity} ud. × ${money(x.unit_price)} · ${escapeHtml(paymentMeta[x.payment_method]||x.payment_method)}</small><small>${x.delivered?'Entregado':'Pendiente de entregar'} · ${new Date(x.created_at).toLocaleDateString('es-ES')}</small></span><span class="lead-right"><strong>${money(x.total)}</strong><button class="head-cta" style="margin-top:6px;padding:7px 10px" onclick="editSale(${x.id},${x.quantity},${Number(x.unit_price)},'${x.payment_method}',${x.delivered})">Editar</button></span></div>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:18px;text-align:center">Todavía no hay ventas. Las ventas se registran únicamente desde Alta.</div>';
+    document.getElementById('salesList').innerHTML=(data.items||[]).map(x=>`<div class="lead-row"><span class="lead-avatar">${escapeHtml((x.lead_name||'V').charAt(0))}</span><span><b>${escapeHtml(x.lead_name||'Venta')}</b><small>${x.quantity} ud. × ${money(x.unit_price)} · ${escapeHtml(paymentMeta[x.payment_method]||x.payment_method)}</small><small>${x.delivered?'Entregado':'Pendiente de entregar'} · Registrado: ${dateTime(x.created_at)}</small></span><span class="lead-right"><strong>${money(x.total)}</strong><button class="head-cta" style="margin-top:6px;padding:7px 10px" onclick="editSale(${x.id},${x.quantity},${Number(x.unit_price)},'${x.payment_method}',${x.delivered})">Editar</button></span></div>`).join('')||'<div style="color:#c3d2e8;font-size:9px;padding:18px;text-align:center">Todavía no hay ventas. Las ventas se registran únicamente desde Alta.</div>';
   }catch(err){toast(err.message)}
 }
 
