@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="/static/admin.css?v=20260921-2245">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-1840">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -25,7 +24,6 @@
       <div class="side-brand"><div class="logo">R</div><strong>Revify</strong><span>Admin</span></div>
       <nav>
         <button class="nav active" data-tab="dashboard" onclick="showTab('dashboard')">◫ Dashboard</button>
-        <button class="nav" data-tab="map" onclick="showTab('map')">◉ Mapa comercial</button>
         <button class="nav" data-tab="postal" onclick="showTab('postal')">⌖ Zonas / CP</button>
         <button class="nav" data-tab="categories" onclick="showTab('categories')">◇ Categorías</button>
         <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
@@ -54,123 +52,41 @@
       </header>
 
       <section id="tab-dashboard" class="tab">
-        <div class="kpis eight">
-          <article><span>Negocios totales</span><b id="kLeads">0</b><small id="kNewLeads">0 nuevos en periodo</small></article>
-          <article><span>Facturación</span><b id="kRevenue">0 €</b><small id="kUnits">0 NFC vendidos</small></article>
+        <div class="kpis executive-kpis">
+          <article><span>Deals totales</span><b id="kLeads">0</b><small id="kNewLeads">0 nuevos en periodo</small></article>
+          <article><span>Deals abiertos</span><b id="kOpenDeals">0</b><small>Cartera activa</small></article>
+          <article><span>Negocios visitados</span><b id="kVisits">0</b><small id="kSalePerVisit">0% venta / visita</small></article>
           <article><span>Ventas</span><b id="kSales">0</b><small id="kAvgTicket">Ticket medio 0 €</small></article>
-          <article><span>Conversión cartera</span><b id="kPortfolioConversion">0%</b><small>Vendidos / negocios</small></article>
-          <article><span>Visitas</span><b id="kVisits">0</b><small id="kSalePerVisit">0% venta / visita</small></article>
-          <article><span>Demos</span><b id="kDemos">0</b><small id="kFollowups">0 seguimientos</small></article>
-          <article><span>Facturación / visita</span><b id="kRevenuePerVisit">0 €</b><small>Eficiencia comercial</small></article>
-          <article><span>Usuarios activos</span><b id="kUsers">0</b><small>Admin + comerciales</small></article>
-        </div>
-        <div class="attention-kpis">
-          <article><span>Deals abiertos</span><b id="kOpenDeals">0</b><small>Cartera todavía trabajable</small></article>
-          <article><span>Seguimientos hoy</span><b id="kFollowupsToday">0</b><small>Acciones previstas para hoy</small></article>
-          <article class="warn"><span>Seguimientos vencidos</span><b id="kOverdue">0</b><small>Necesitan acción comercial</small></article>
-          <article class="danger"><span>Sin tocar 7+ días</span><b id="kStale">0</b><small>Deals abiertos sin movimiento</small></article>
-        </div>
-
-        <section class="panel attention-panel">
-          <div class="panel-head"><div><h2>Oportunidades que requieren atención</h2><p>Seguimientos vencidos y deals abiertos sin actividad reciente.</p></div><button class="link" onclick="showTab('leads')">Abrir cartera</button></div>
-          <div id="attentionList" class="attention-list"></div>
-        </section>
-
-        <section class="panel intelligence-panel">
-          <div class="panel-head"><div><h2>Inteligencia comercial</h2><p>Lecturas automáticas construidas únicamente con la actividad real del CRM.</p></div><span class="smart-badge">Revify Intelligence</span></div>
-          <div id="smartInsights" class="insight-grid"></div>
-        </section>
-
-        <div class="two-col health-grid">
-          <section class="panel">
-            <div class="panel-head"><div><h2>Salud del pipeline</h2><p>Días desde el último movimiento de los deals que siguen abiertos.</p></div><b id="avgOpenAge">0 días</b></div>
-            <div id="pipelineAging" class="aging-list"></div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><div><h2>Calidad comercial</h2><p>Conversión real, velocidad de cierre y disciplina de seguimiento.</p></div></div>
-            <div class="quality-grid">
-              <article><span>Win rate decidido</span><b id="qWinRate">0%</b><small>Ganados / ganados + perdidos</small></article>
-              <article><span>Días hasta venta</span><b id="qDaysToSale">0</b><small>Media del periodo</small></article>
-              <article><span>Seguimientos programados</span><b id="qFollowScheduled">0%</b><small>Follow-ups con fecha/hora</small></article>
-              <article><span>Follow-ups vencidos</span><b id="qFollowOverdue">0%</b><small>Sobre los programados</small></article>
-              <article><span>Cobertura Barcelona</span><b id="qCoverage">0%</b><small id="qCoverageCount">0 / 42 CP</small></article>
-              <article><span>Facturación / visita</span><b id="qRevenueVisit">0 €</b><small>Eficiencia de calle</small></article>
-            </div>
-          </section>
+          <article><span>Facturación</span><b id="kRevenue">0 €</b><small id="kUnits">0 NFC vendidos</small></article>
+          <article><span>Conversión cartera</span><b id="kPortfolioConversion">0%</b><small>Vendidos / deals totales</small></article>
         </div>
 
         <div class="two-col">
           <section class="panel">
-            <div class="panel-head"><div><h2>Embudo actual</h2><p>Distribución de todos los negocios por estado</p></div></div>
+            <div class="panel-head"><div><h2>Embudo actual</h2><p>Cómo se reparte la cartera por estado.</p></div></div>
             <div id="statusFunnel" class="funnel"></div>
           </section>
           <section class="panel">
-            <div class="panel-head"><div><h2>Tendencia diaria</h2><p>Últimos días: leads, visitas, ventas y facturación</p></div></div>
+            <div class="panel-head"><div><h2>Evolución</h2><p>Deals, visitas, ventas y facturación del periodo.</p></div></div>
             <div id="dailyTrend" class="daily-trend"></div>
           </section>
         </div>
 
         <section class="panel">
-          <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Actividad y resultado del periodo seleccionado</p></div><button class="link" onclick="showTab('team')">Ver equipo completo</button></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>Comercial</th><th>Leads</th><th>Abiertos</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Vencidos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket</th><th>Facturación</th><th>Última actividad</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
+          <div class="panel-head"><div><h2>Rendimiento por comercial</h2><p>Lo esencial: cartera, actividad, ventas y facturación.</p></div><button class="link" onclick="showTab('team')">Ver equipo completo</button></div>
+          <div class="table-wrap"><table class="wide executive-table"><thead><tr><th>Comercial</th><th>Deals</th><th>Abiertos</th><th>Visitas</th><th>Ventas</th><th>Conversión</th><th>Ticket medio</th><th>Facturación</th></tr></thead><tbody id="repPerformance"></tbody></table></div>
         </section>
 
         <div class="two-col">
           <section class="panel">
-            <div class="panel-head"><div><h2>Top zonas</h2><p>CP + barrio/zona, ordenados por facturación del periodo</p></div><button class="link" onclick="showTab('postal')">Ver todos</button></div>
+            <div class="panel-head"><div><h2>Top zonas</h2><p>Qué CP están generando más negocio.</p></div><button class="link" onclick="showTab('postal')">Ver todos</button></div>
             <div id="postalTop" class="mini-ranking"></div>
           </section>
           <section class="panel">
-            <div class="panel-head"><div><h2>Top categorías</h2><p>Qué tipo de comercio está generando más</p></div><button class="link" onclick="showTab('categories')">Ver todas</button></div>
+            <div class="panel-head"><div><h2>Top categorías</h2><p>Qué tipo de comercio está generando más.</p></div><button class="link" onclick="showTab('categories')">Ver todas</button></div>
             <div id="categoryTop" class="mini-ranking"></div>
           </section>
         </div>
-      </section>
-
-      <section id="tab-map" class="tab hidden">
-        <section class="panel map-command">
-          <div class="map-toolbar">
-            <div class="map-search-wrap">
-              <label>BUSCAR CALLE / DIRECCIÓN</label>
-              <div class="map-search-row">
-                <input id="mapAddressQuery" placeholder="Ej. Carrer de Santa Teresa 12, Sant Cugat" onkeydown="if(event.key==='Enter'){event.preventDefault();searchMapAddress()}">
-                <button class="primary small" onclick="searchMapAddress()">Buscar</button>
-              </div>
-              <div id="mapAddressResults" class="map-address-results hidden"></div>
-            </div>
-            <div class="map-control">
-              <label>VISUALIZAR</label>
-              <select id="mapMetric" onchange="setMapMetric(this.value)">
-                <option value="activity">Actividad / visitas</option>
-                <option value="leads">Negocios registrados</option>
-                <option value="sales">Ventas</option>
-                <option value="followups">Seguimientos</option>
-                <option value="revenue">Facturación</option>
-                <option value="conversion">Conversión</option>
-              </select>
-            </div>
-            <div class="map-control map-focus-control">
-              <label>ENFOQUE</label>
-              <div class="map-focus-buttons">
-                <button onclick="focusCommercialMap('all')">Global</button>
-                <button onclick="focusCommercialMap('barcelona')">Barcelona</button>
-                <button onclick="focusCommercialMap('santcugat')">Sant Cugat</button>
-                <button onclick="focusCommercialMap('rubi')">Rubí</button>
-              </div>
-            </div>
-          </div>
-          <div class="map-summary">
-            <div><span>CP objetivo trabajados</span><b id="mapWorked">0</b></div>
-            <div><span>CP objetivo totales</span><b id="mapTarget">0</b></div>
-            <div><span>Cobertura</span><b id="mapCoverage">0%</b></div>
-            <div><span>CP visibles en mapa</span><b id="mapVisible">0</b></div>
-            <div class="map-legend-inline"><i class="legend-none"></i> Sin actividad <i class="legend-low"></i> Baja <i class="legend-mid"></i> Media <i class="legend-high"></i> Alta</div>
-          </div>
-        </section>
-        <section class="panel map-panel">
-          <div id="commercialMap" class="commercial-map"></div>
-          <div class="map-source-note">Mapa base © OpenStreetMap · Límites postales: geometrías cartográficas de referencia derivadas de CNIG · Municipios/códigos: callejero INE. Barcelona + Sant Cugat + Rubí se muestran como territorio objetivo; la periferia permanece visible para contexto comercial.</div>
-        </section>
       </section>
 
       <section id="tab-postal" class="tab hidden">
@@ -210,7 +126,7 @@
       <section id="tab-team" class="tab hidden">
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento y accesos</h2><p>Un CRM por usuario, una única base de datos para dirección.</p></div><button class="primary small" onclick="openCreateCommercial()">＋ Nuevo comercial</button></div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Leads</th><th>Abiertos</th><th>Ganados</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Vencidos</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Ticket</th><th>Facturación</th><th>Última actividad</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Deals</th><th>Abiertos</th><th>Visitas</th><th>Ventas</th><th>Conversión</th><th>Ticket medio</th><th>Facturación</th><th></th></tr></thead><tbody id="teamTable"></tbody></table></div>
         </section>
         <div id="credentialBox" class="credential hidden"></div>
       </section>
@@ -255,7 +171,7 @@
           </section>
           <section class="panel info-panel">
             <h2>Cómo funciona el dato</h2>
-            <p>Cada comercial inicia sesión con su propio usuario. Los leads, visitas, demos, estados y ventas que registra se guardan en la base de datos central.</p>
+            <p>Cada comercial inicia sesión con su propio usuario. Los deals, visitas, estados y ventas que registra se guardan en la base de datos central.</p>
             <p>El Admin agrega esa información por <b>código postal, categoría, negocio y comercial</b>. La facturación que ves aquí proviene de las ventas realmente registradas en el CRM.</p>
           </section>
         </div>
@@ -277,7 +193,6 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="/static/admin.js?v=20260921-2245"></script>
+  <script src="/static/admin.js?v=20260921-1840"></script>
 </body>
 </html>
