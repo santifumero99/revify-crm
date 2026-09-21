@@ -118,17 +118,23 @@ function renderCategoryKpis(){
   document.getElementById('catKConv').textContent=pct(s.portfolio_conversion_pct);
   document.getElementById('catKRevenue').textContent=money(s.revenue);
 }
+function deltaText(key){
+  const d=analytics.comparison&&analytics.comparison.delta_pct?analytics.comparison.delta_pct[key]:null;
+  if(d===null||d===undefined)return '';
+  const sign=d>0?'+':'';
+  return ' · '+sign+d.toFixed(1).replace('.0','')+'% vs anterior';
+}
 function renderDashboard(){
   const s=analytics.summary||{};
   document.getElementById('kLeads').textContent=num(s.leads_total);
-  document.getElementById('kNewLeads').textContent=num(s.new_leads)+' nuevos en periodo';
+  document.getElementById('kNewLeads').textContent=num(s.new_leads)+' nuevos'+deltaText('new_leads');
   document.getElementById('kRevenue').textContent=money(s.revenue);
-  document.getElementById('kUnits').textContent=num(s.units)+' NFC vendidos';
+  document.getElementById('kUnits').textContent=num(s.units)+' NFC ·'+(deltaText('revenue')||'').replace(/^ · /,' ');
   document.getElementById('kSales').textContent=num(s.sales);
-  document.getElementById('kAvgTicket').textContent='Ticket medio '+money(s.avg_ticket);
+  document.getElementById('kAvgTicket').textContent='Ticket '+money(s.avg_ticket)+(deltaText('sales')||'');
   document.getElementById('kPortfolioConversion').textContent=pct(s.portfolio_conversion_pct);
   document.getElementById('kVisits').textContent=num(s.visits);
-  document.getElementById('kSalePerVisit').textContent=pct(s.sale_per_visit_pct)+' venta / visita';
+  document.getElementById('kSalePerVisit').textContent=pct(s.sale_per_visit_pct)+' venta / visita'+(deltaText('visits')||'');
   document.getElementById('kDemos').textContent=num(s.demos);
   document.getElementById('kFollowups').textContent=num(s.followups)+' seguimientos';
   document.getElementById('kRevenuePerVisit').textContent=money(s.revenue_per_visit);
@@ -137,7 +143,17 @@ function renderDashboard(){
   document.getElementById('kFollowupsToday').textContent=num(s.followups_today);
   document.getElementById('kOverdue').textContent=num(s.overdue_followups);
   document.getElementById('kStale').textContent=num(s.stale_active_leads);
+  document.getElementById('avgOpenAge').textContent=(s.avg_open_age_days||0)+' días';
+  document.getElementById('qWinRate').textContent=pct(s.decision_win_rate_pct);
+  document.getElementById('qDaysToSale').textContent=Number(s.avg_days_to_sale||0).toFixed(1).replace('.0','');
+  document.getElementById('qFollowScheduled').textContent=pct(s.followup_scheduled_pct);
+  document.getElementById('qFollowOverdue').textContent=pct(s.followup_overdue_pct);
+  document.getElementById('qCoverage').textContent=pct(s.territory_coverage_pct);
+  document.getElementById('qCoverageCount').textContent=num(s.covered_postal_codes)+' / '+num(s.territory_total_postal_codes)+' CP';
+  document.getElementById('qRevenueVisit').textContent=money(s.revenue_per_visit);
   renderAttention();
+  renderInsights();
+  renderPipelineAging();
 
   const total=Math.max(1,s.leads_total||0);
   document.getElementById('statusFunnel').innerHTML=(analytics.statuses||[]).map(function(x){
@@ -151,7 +167,9 @@ function renderDashboard(){
     return '<div class="trend-row"><span>'+x.date.slice(5)+'</span><div class="trend-bar"><i style="width:'+Math.max(2,(x.revenue/maxRevenue)*100)+'%"></i></div><small>L '+x.leads+' · V '+x.visits+' · ✓ '+x.sales+'</small><b>'+money(x.revenue)+'</b></div>';
   }).join('')||'<p class="empty">Sin actividad todavía.</p>';
 
-  document.getElementById('repPerformance').innerHTML=(analytics.reps||[]).map(repRow).join('');
+  const globalRep=document.getElementById('globalRep')?.value||'';
+  const repRows=(analytics.reps||[]).filter(function(r){return r.role!=='admin'&&(!globalRep||String(r.id)===String(globalRep))});
+  document.getElementById('repPerformance').innerHTML=repRows.map(repRow).join('')||'<tr><td colspan="15">Sin datos para este segmento.</td></tr>';
   renderPostalRanking();
   renderMiniRanking('categoryTop',analytics.categories||[],'category');
 }
@@ -174,6 +192,35 @@ function focusAttentionLead(name){
   showTab('leads');
   const search=document.getElementById('fSearch');
   if(search){search.value=name;loadAdminLeads(true)}
+}
+function renderInsights(){
+  const box=document.getElementById('smartInsights');if(!box)return;
+  const rows=analytics.insights||[];
+  box.innerHTML=rows.map(function(x){
+    return '<article class="insight-card '+esc(x.level||'info')+'"><span class="insight-dot"></span><div><b>'+esc(x.title)+'</b><p>'+esc(x.body)+'</p></div></article>';
+  }).join('')||'<div class="attention-empty">Todavía no hay suficiente actividad para generar lecturas útiles.</div>';
+}
+function renderPipelineAging(){
+  const box=document.getElementById('pipelineAging');if(!box)return;
+  const a=analytics.pipeline_aging||{};
+  const rows=[['0–2 días',a['0_2']||0],['3–7 días',a['3_7']||0],['8–14 días',a['8_14']||0],['15+ días',a['15_plus']||0]];
+  const max=Math.max.apply(null,[1].concat(rows.map(function(x){return x[1]})));
+  box.innerHTML=rows.map(function(x,i){
+    const cls=i>=3?'old':i===2?'warm':'';
+    return '<div class="aging-row '+cls+'"><div><b>'+x[0]+'</b><span>'+num(x[1])+' deals</span></div><div class="aging-meter"><i style="width:'+Math.max(3,(x[1]/max)*100)+'%"></i></div></div>';
+  }).join('');
+}
+function renderTerritory(){
+  const s=analytics.summary||{};
+  const pctv=Math.max(0,Math.min(100,Number(s.territory_coverage_pct||0)));
+  const p=document.getElementById('postalCoveragePct');if(p)p.textContent=pct(pctv);
+  const b=document.getElementById('postalCoverageBar');if(b)b.style.width=pctv+'%';
+  const t=document.getElementById('postalCoverageText');if(t)t.textContent=num(s.covered_postal_codes)+' de '+num(s.territory_total_postal_codes)+' códigos postales con deals.';
+  const box=document.getElementById('whitespaceList');
+  if(box)box.innerHTML=(analytics.whitespace||[]).slice(0,12).map(function(x){return '<button onclick="filterPostalZone(\''+esc(x.postal_code)+'\')"><b>'+esc(x.postal_code)+'</b><span>'+esc(x.zone_short)+'</span></button>'}).join('')||'<div class="attention-empty">Toda la cobertura postal del directorio ya tiene actividad.</div>';
+}
+function filterPostalZone(cp){
+  const sel=document.getElementById('postalSegment');if(sel){sel.value=cp;loadAnalytics()}
 }
 function renderMiniRanking(id,rows,key){
   const top=rows.slice(0,6);
