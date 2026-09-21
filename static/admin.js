@@ -309,16 +309,33 @@ function csvCell(v){
   const s=String(v==null?'':v).replaceAll('"','""');
   return '"'+s+'"';
 }
-function exportVisibleBusinesses(){
-  if(!visibleBusinesses.length){alert('No hay negocios visibles para exportar.');return}
+async function exportVisibleBusinesses(){
+  const p=new URLSearchParams({limit:'100'});
+  const search=document.getElementById('fSearch').value.trim();
+  const postal=document.getElementById('fPostal').value.trim()||document.getElementById('postalSegment').value||'';
+  const rep=document.getElementById('fRep').value;
+  const status=document.getElementById('fStatus').value;
+  const cat=document.getElementById('fCategory').value;
+  if(search)p.set('search',search);if(postal)p.set('postal_code',postal);if(rep)p.set('assigned_user_id',rep);if(status)p.set('status',status);if(cat)p.set('business_type',cat);
+  let rows=[];let cursor=null;let guard=0;
+  try{
+    do{
+      if(cursor)p.set('cursor',cursor);else p.delete('cursor');
+      const data=await req('/admin/leads?'+p.toString());
+      rows=rows.concat(data.items||[]);
+      cursor=data.next_cursor||null;
+      guard+=1;
+    }while(cursor&&guard<100);
+  }catch(ex){alert('No se pudo preparar el CSV: '+ex.message);return}
+  if(!rows.length){alert('No hay negocios con estos filtros.');return}
   const head=['Negocio','Dirección','CP','Barrio / zona','Categoría','Tipo','Comercial','Estado','Visitas','Demos','Ventas','Unidades','Ticket','Facturación','Contacto','Teléfono','Próxima acción','Actualizado'];
-  const rows=visibleBusinesses.map(function(x){
+  const body=rows.map(function(x){
     const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'');
     return [x.name,x.address,x.postal_code,x.zone_label||x.zone_short,x.business_type,x.business_subtype,x.rep_email,statusLabel(x.status),x.visits,x.demos,x.sales,x.units,x.avg_ticket,x.revenue,x.owner_name,x.phone,next,dateText(x.updated_at)];
   });
-  const csv='\uFEFF'+[head].concat(rows).map(function(r){return r.map(csvCell).join(';')}).join('\n');
+  const csv='\uFEFF'+[head].concat(body).map(function(r){return r.map(csvCell).join(';')}).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revify-negocios-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},500);
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revify-negocios-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},500);
 }
 
 function openCreateCommercial(){
