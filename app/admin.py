@@ -196,12 +196,14 @@ def admin_me(admin: User = Depends(require_admin)):
 def admin_analytics(
     days: int = Query(30, ge=0, le=3650),
     postal_code: str = "",
+    assigned_user_id: Optional[int] = None,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     start = _period_start(days)
     postal_code = postal_code.strip()
     postal_cond = Lead.postal_code == postal_code if postal_code else None
+    rep_cond = Lead.assigned_user_id == assigned_user_id if assigned_user_id else None
 
     all_postal_codes = list(db.scalars(
         select(Lead.postal_code)
@@ -215,6 +217,9 @@ def admin_analytics(
     if postal_cond is not None:
         lead_count_q = lead_count_q.where(postal_cond)
         won_q = won_q.where(postal_cond)
+    if rep_cond is not None:
+        lead_count_q = lead_count_q.where(rep_cond)
+        won_q = won_q.where(rep_cond)
     lead_count = db.scalar(lead_count_q) or 0
     won_leads = db.scalar(won_q) or 0
     active_users = db.scalar(select(func.count()).select_from(User).where(User.is_active == True)) or 0
@@ -237,10 +242,24 @@ def admin_analytics(
         )
         .select_from(Sale)
     )
+    activity_joined=False
+    sales_joined=False
     if postal_cond is not None:
         lead_period_q = lead_period_q.where(postal_cond)
         activity_period_q = activity_period_q.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
         sales_period_q = sales_period_q.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
+        activity_joined=True
+        sales_joined=True
+    if rep_cond is not None:
+        lead_period_q = lead_period_q.where(rep_cond)
+        if not activity_joined:
+            activity_period_q = activity_period_q.join(Lead, Lead.id == Activity.lead_id)
+            activity_joined=True
+        if not sales_joined:
+            sales_period_q = sales_period_q.join(Lead, Lead.id == Sale.lead_id)
+            sales_joined=True
+        activity_period_q = activity_period_q.where(rep_cond)
+        sales_period_q = sales_period_q.where(rep_cond)
     if start:
         lead_period_q = lead_period_q.where(Lead.created_at >= start)
         activity_period_q = activity_period_q.where(Activity.created_at >= start)
@@ -260,6 +279,8 @@ def admin_analytics(
     status_q = select(Lead.status, func.count(Lead.id)).group_by(Lead.status).order_by(func.count(Lead.id).desc())
     if postal_cond is not None:
         status_q = status_q.where(postal_cond)
+    if rep_cond is not None:
+        status_q = status_q.where(rep_cond)
     status_rows = db.execute(status_q).all()
     statuses = [{
         "status": status,
@@ -301,6 +322,10 @@ def admin_analytics(
             base_q = base_q.where(postal_cond)
             aq = aq.where(postal_cond)
             sq = sq.where(postal_cond)
+        if rep_cond is not None:
+            base_q = base_q.where(rep_cond)
+            aq = aq.where(rep_cond)
+            sq = sq.where(rep_cond)
         if start:
             aq = aq.where(Activity.created_at >= start)
             sq = sq.where(Sale.created_at >= start)
@@ -319,6 +344,8 @@ def admin_analytics(
     alert_base=[Lead.status.in_(["pending","owner_absent","closed","follow_up"])]
     if postal_cond is not None:
         alert_base.append(postal_cond)
+    if rep_cond is not None:
+        alert_base.append(rep_cond)
     open_deals=db.scalar(select(func.count()).select_from(Lead).where(*alert_base)) or 0
     followups_today=db.scalar(select(func.count()).select_from(Lead).where(
         *alert_base,
@@ -341,6 +368,8 @@ def admin_analytics(
     stale_q=select(func.count()).select_from(Lead).where(stale_condition)
     if postal_cond is not None:
         stale_q=stale_q.where(postal_cond)
+    if rep_cond is not None:
+        stale_q=stale_q.where(rep_cond)
     stale_active_leads=db.scalar(stale_q) or 0
 
     attention_q=(
@@ -353,6 +382,8 @@ def admin_analytics(
     )
     if postal_cond is not None:
         attention_q=attention_q.where(postal_cond)
+    if rep_cond is not None:
+        attention_q=attention_q.where(rep_cond)
     attention_rows=db.execute(
         attention_q.order_by(
             case(((Lead.status=="follow_up") & (Lead.follow_up_at.is_not(None)) & (Lead.follow_up_at<now),0),else_=1),
