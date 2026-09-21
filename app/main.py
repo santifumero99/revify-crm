@@ -237,7 +237,8 @@ def create_lead(data:LeadCreate,user:User=Depends(current_user),db:Session=Depen
     db.flush()
     audit(db,user.id,'lead_created',x.id,{'status':x.status})
     initial_activity={'owner_absent':'owner_absent','closed':'closed','follow_up':'follow_up','lost':'no_interest'}.get(data.status,'visit')
-    db.add(Activity(lead_id=x.id,actor_user_id=user.id,activity_type=initial_activity,notes='Alta inicial del deal'))
+    initial_note=data.initial_notes.strip() or 'Alta inicial del deal'
+    db.add(Activity(lead_id=x.id,actor_user_id=user.id,activity_type=initial_activity,notes=initial_note))
 
     sale=None
     if data.status=='won':
