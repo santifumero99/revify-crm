@@ -78,11 +78,10 @@ POSTAL_ZONE_MAP = {
     "08071": "Organismes oficials — codi especial",
     "08075": "Ciutat de la Justícia / Gran Via 111 — codi especial",
     "08080": "Apartats particulars i llista — codi especial",
-    "08171": "Sant Cugat del Vallès — codi especial/no territorial",
     "08172": "Sant Cugat del Vallès — zona postal 08172",
     "08173": "Sant Cugat del Vallès — zona postal 08173",
     "08174": "Sant Cugat del Vallès — zona postal 08174",
-    "08190": "Sant Cugat del Vallès — codi especial/institucional",
+    "08190": "Sant Cugat del Vallès — nucli urbà",
     "08195": "Mira-sol · Sant Cugat del Vallès",
     "08196": "Les Planes · Sant Cugat del Vallès",
     "08197": "Valldoreix · Sant Cugat del Vallès",
@@ -90,9 +89,9 @@ POSTAL_ZONE_MAP = {
     "08191": "Rubí",
 }
 
-POSTAL_SPECIAL_CODES = {"08070","08071","08075","08080","08171","08190"}
+POSTAL_SPECIAL_CODES = {"08070","08071","08075","08080"}
 BARCELONA_TERRITORIAL_CODES = {f"080{i:02d}" for i in range(1,43)}
-SANT_CUGAT_TERRITORIAL_CODES = {"08172","08173","08174","08195","08196","08197","08198"}
+SANT_CUGAT_TERRITORIAL_CODES = {"08172","08173","08174","08190","08195","08196","08197","08198"}
 RUBI_TERRITORIAL_CODES = {"08191"}
 COVERAGE_POSTAL_CODES = BARCELONA_TERRITORIAL_CODES | SANT_CUGAT_TERRITORIAL_CODES | RUBI_TERRITORIAL_CODES
 
@@ -100,7 +99,7 @@ def postal_municipality(postal_code: str):
     cp=(postal_code or "").strip()
     if cp in BARCELONA_TERRITORIAL_CODES or cp in {"08070","08071","08075","08080"}:
         return "Barcelona"
-    if cp in SANT_CUGAT_TERRITORIAL_CODES or cp in {"08171","08190"}:
+    if cp in SANT_CUGAT_TERRITORIAL_CODES:
         return "Sant Cugat del Vallès"
     if cp in RUBI_TERRITORIAL_CODES:
         return "Rubí"
@@ -289,6 +288,19 @@ def _lead_filters(search="", postal_code="", business_type="", status="", assign
 @router.get("/api/admin/me")
 def admin_me(admin: User = Depends(require_admin)):
     return {"id": admin.id, "email": admin.email, "role": "admin"}
+
+@router.get("/api/address-resolve")
+def address_resolve(
+    q: str = Query(..., min_length=3, max_length=220),
+    user: User = Depends(current_user),
+):
+    query=q.strip()
+    try:
+        items=geocode_target_address(query)
+    except Exception:
+        raise HTTPException(status_code=502, detail="No se pudo consultar el servicio de direcciones")
+    return {"query":query,"items":items}
+
 
 @router.get("/api/admin/analytics")
 def admin_analytics(
@@ -591,14 +603,14 @@ def admin_analytics(
     ]
     avg_days_to_sale=round(sum(sale_cycles)/len(sale_cycles),1) if sale_cycles else 0
 
-    coverage_q=select(Lead.postal_code).where(Lead.postal_code.in_(list(POSTAL_ZONE_MAP.keys())))
+    coverage_q=select(Lead.postal_code).where(Lead.postal_code.in_(list(COVERAGE_POSTAL_CODES)))
     if rep_cond is not None:
         coverage_q=coverage_q.where(rep_cond)
     covered_cps=set(db.scalars(coverage_q.distinct()).all())
-    territory_total=len(POSTAL_ZONE_MAP)
+    territory_total=len(COVERAGE_POSTAL_CODES)
     territory_coverage_pct=round((len(covered_cps)/territory_total*100),1) if territory_total else 0
     whitespace=[
-        postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())
+        postal_zone(cp) for cp in sorted(COVERAGE_POSTAL_CODES)
         if cp not in covered_cps
     ]
 
@@ -844,6 +856,7 @@ def admin_analytics(
         "segment": {"postal_code": postal_code or None,"assigned_user_id":assigned_user_id},
         "available_postal_codes": all_postal_codes,
         "postal_directory":[postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())],
+        "coverage_postal_codes":sorted(COVERAGE_POSTAL_CODES),
         "summary": {
             "active_users": int(active_users),
             "open_deals":int(open_deals),
