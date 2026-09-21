@@ -186,6 +186,28 @@ def geocode_target_address(query: str):
         })
     return out
 
+@lru_cache(maxsize=1)
+def fetch_osm_postal_boundaries():
+    query='''[out:json][timeout:35];
+    (
+      relation["boundary"="postal_code"]["postal_code"](41.26,1.82,41.66,2.32);
+      relation["boundary"="administrative"]["postal_code"](41.26,1.82,41.66,2.32);
+    );
+    out body;
+    >;
+    out skel qt;'''
+    req=Request(
+        "https://overpass-api.de/api/interpreter",
+        data=query.encode("utf-8"),
+        headers={
+            "User-Agent":"RevifyCRM/1.0 (postal boundary admin map)",
+            "Content-Type":"application/x-www-form-urlencoded"
+        },
+        method="POST"
+    )
+    with urlopen(req,timeout=45) as response:
+        return json.loads(response.read().decode("utf-8"))
+
 def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin" and user.email.lower() != ADMIN_EMAIL:
         raise HTTPException(status_code=403, detail="Acceso de administrador requerido")
@@ -288,6 +310,32 @@ def _lead_filters(search="", postal_code="", business_type="", status="", assign
 @router.get("/api/admin/me")
 def admin_me(admin: User = Depends(require_admin)):
     return {"id": admin.id, "email": admin.email, "role": "admin"}
+
+@router.get("/api/admin/address-resolve")
+def admin_address_resolve(
+    q: str = Query(min_length=3, max_length=250),
+    admin: User = Depends(require_admin),
+):
+    text_q=q.strip()
+    try:
+        items=geocode_target_address(text_q)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="No se pudo consultar el geocodificador en este momento")
+    return {"query":text_q,"items":items}
+
+@router.get("/api/admin/postal-boundaries")
+def admin_postal_boundaries(admin: User = Depends(require_admin)):
+    try:
+        raw=fetch_osm_postal_boundaries()
+    except Exception:
+        raise HTTPException(status_code=502, detail="No se pudieron cargar los límites postales")
+    return {
+        "target_postal_codes":sorted(POSTAL_ZONE_MAP.keys()),
+        "coverage_postal_codes":sorted(COVERAGE_POSTAL_CODES),
+        "special_postal_codes":sorted(POSTAL_SPECIAL_CODES),
+        "directory":[postal_zone(cp) for cp in sorted(POSTAL_ZONE_MAP.keys())],
+        "osm":raw,
+    }
 
 @router.get("/api/address-resolve")
 def address_resolve(
