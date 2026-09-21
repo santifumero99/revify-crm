@@ -4,6 +4,7 @@ let currentUser=null;
 let leads=[];
 let nextCursor=null;
 let currentLeadId=null;
+let currentLead=null;
 let priorityLead=null;
 let searchTimer=null;
 const PAGE_SIZE=50;
@@ -17,6 +18,7 @@ const statusMeta={
   lost:['No vendido','lost']
 };
 const paymentMeta={cash:'Efectivo',card:'Tarjeta',bizum:'Bizum',transfer:'Transferencia',other:'Otro'};
+const activityMeta={visit:'Visita',demo:'Demo',follow_up:'Seguimiento',owner_absent:'No estaba el dueño',closed:'Local cerrado',no_interest:'No vendido',note:'Nota'};
 
 function money(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(Number(n||0))}
 function dateTime(v){if(!v)return '—';return new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(v))}
@@ -120,10 +122,40 @@ function renderLeads(summary={}){
 
 async function openLead(id){
   try{
-    const x=await api('/leads/'+id);currentLeadId=id;
+    const [x,h]=await Promise.all([api('/leads/'+id),api('/leads/'+id+'/activities?limit=20')]);
+    currentLeadId=id;currentLead=x;
     hideScreens();showAppNav();document.getElementById('screen-lead-detail').classList.add('active');setNav('leads');
     const editable=x.status!=='won';
-    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div><div><span>ÚLTIMA ACTUALIZACIÓN</span><b>${dateTime(x.updated_at)}</b></div></div><div class="detail-actions">${editable?`<button class="blue" onclick="editLead(${x.id})">Editar deal</button><button onclick="registerActivity(${x.id})">Nueva visita</button>`:'<button onclick="editLead(${x.id})">Editar datos</button><button onclick="showSales()">Ver venta</button>'}</div></div>`;
+    const quick=`${x.phone?`<button onclick="callCurrentLead()">Llamar</button>`:''}${x.address?`<button onclick="mapCurrentLead()">Maps</button>`:''}`;
+    const history=(h.items||[]).map(a=>`<div class="activity-row"><div><b>${escapeHtml(activityMeta[a.activity_type]||a.activity_type)}</b><small>${dateTime(a.created_at)}</small></div><p>${escapeHtml(a.notes||'Sin nota')}</p></div>`).join('')||'<div class="activity-empty">Todavía no hay visitas registradas.</div>';
+    document.getElementById('leadDetail').innerHTML=`<div class="detail-card"><div class="detail-top"><span class="lead-avatar">${escapeHtml(x.name.charAt(0))}</span><div><h3>${escapeHtml(x.name)}</h3><p>${escapeHtml(x.address||'Sin dirección')}${x.postal_code?` · ${escapeHtml(x.postal_code)}`:''}</p>${pill(x.status)}</div></div><div class="detail-meta"><div><span>CATEGORÍA</span><b>${escapeHtml(x.business_type||'—')}</b></div><div><span>TIPO CONCRETO</span><b>${escapeHtml(x.business_subtype||'—')}</b></div><div><span>RESPONSABLE</span><b>${escapeHtml(x.owner_name||'—')}</b></div><div><span>TELÉFONO</span><b>${escapeHtml(x.phone||'—')}</b></div><div><span>CÓDIGO POSTAL</span><b>${escapeHtml(x.postal_code||'—')}</b></div><div><span>RESULTADO</span><b>${(statusMeta[x.status]||statusMeta.pending)[0]}</b></div><div><span>REGISTRADO</span><b>${dateTime(x.created_at)}</b></div><div><span>ÚLTIMA ACTUALIZACIÓN</span><b>${dateTime(x.updated_at)}</b></div></div><div class="detail-actions">${editable?`<button class="blue" onclick="editLead(${x.id})">Editar deal</button><button onclick="showVisitForm(${x.id})">Nueva visita</button>`:'<button onclick="editLead(${x.id})">Editar datos</button><button onclick="showSales()">Ver venta</button>'}${quick}</div><div id="visitPanel"></div></div><div class="history-card"><div class="history-head"><b>Historial de actividad</b><span>${(h.items||[]).length}</span></div>${history}</div>`;
+  }catch(err){toast(err.message)}
+}
+
+function callCurrentLead(){
+  if(!currentLead?.phone)return;
+  window.location.href='tel:'+currentLead.phone.replace(/[^+0-9]/g,'');
+}
+function mapCurrentLead(){
+  if(!currentLead?.address)return;
+  const q=[currentLead.address,currentLead.postal_code].filter(Boolean).join(', ');
+  window.open('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q),'_blank','noopener');
+}
+function showVisitForm(id){
+  const box=document.getElementById('visitPanel');if(!box)return;
+  box.innerHTML=`<form class="visit-form" onsubmit="saveVisit(event,${id})"><div class="visit-title">Registrar nueva visita</div><label>RESULTADO</label><select id="visitStatus"><option value="pending">Pendiente / en curso</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="lost">No vendido</option></select><label>NOTA DE LA VISITA</label><textarea id="visitNotes" rows="3" placeholder="Ej. Hablar con Marta el jueves; interesada en 2 unidades..."></textarea><div class="visit-actions"><button type="button" onclick="document.getElementById('visitPanel').innerHTML=''">Cancelar</button><button class="blue">Guardar visita</button></div><small>Si ha comprado, usa “Editar deal” → Vendido para registrar también la venta.</small></form>`;
+}
+async function saveVisit(e,id){
+  e.preventDefault();
+  const status=document.getElementById('visitStatus').value;
+  const notes=document.getElementById('visitNotes').value.trim();
+  const type={pending:'visit',owner_absent:'owner_absent',closed:'closed',follow_up:'follow_up',lost:'no_interest'}[status]||'visit';
+  try{
+    await api('/leads/'+id,{method:'PATCH',body:JSON.stringify({status})});
+    await api('/leads/'+id+'/activities',{method:'POST',body:JSON.stringify({activity_type:type,notes})});
+    toast('Visita registrada');
+    await openLead(id);
+    loadDashboard();
   }catch(err){toast(err.message)}
 }
 
@@ -212,9 +244,7 @@ async function cycleStatus(id,current){
   const next=order[(pos+1)%order.length];
   try{await api('/leads/'+id,{method:'PATCH',body:JSON.stringify({status:next})});await openLead(id);toast('Estado actualizado')}catch(err){toast(err.message)}
 }
-async function registerActivity(id){
-  try{await api('/leads/'+id+'/activities',{method:'POST',body:JSON.stringify({activity_type:'visit',notes:''})});toast('Nueva visita registrada');await openLead(id);await loadDashboard()}catch(err){toast(err.message)}
-}
+
 
 function toggleCreateSaleFields(){
   const won=document.getElementById('newStatus')?.value==='won';
