@@ -74,7 +74,6 @@ function showTab(name){
   document.querySelectorAll('.nav').forEach(function(x){x.classList.toggle('active',x.dataset.tab===name)});
   const titles={
     dashboard:['Dashboard','Visión global de Revify'],
-    map:['Mapa comercial','Cobertura territorial, códigos postales y actividad de calle'],
     postal:['Zonas y códigos postales','Rendimiento geográfico de la cartera'],
     categories:['Categorías','Rendimiento por tipo de comercio'],
     team:['Comerciales','Actividad, resultado y accesos'],
@@ -314,32 +313,14 @@ function renderDashboard(){
   const s=analytics.summary||{};
   document.getElementById('kLeads').textContent=num(s.leads_total);
   document.getElementById('kNewLeads').textContent=num(s.new_leads)+' nuevos'+deltaText('new_leads');
-  document.getElementById('kRevenue').textContent=money(s.revenue);
-  document.getElementById('kUnits').textContent=num(s.units)+' NFC vendidos'+(deltaText('revenue')||'');
-  document.getElementById('kSales').textContent=num(s.sales);
-  document.getElementById('kAvgTicket').textContent='Ticket '+money(s.avg_ticket)+(deltaText('sales')||'');
-  document.getElementById('kPortfolioConversion').textContent=pct(s.portfolio_conversion_pct);
+  document.getElementById('kOpenDeals').textContent=num(s.open_deals);
   document.getElementById('kVisits').textContent=num(s.visits);
   document.getElementById('kSalePerVisit').textContent=pct(s.sale_per_visit_pct)+' venta / visita'+(deltaText('visits')||'');
-  document.getElementById('kDemos').textContent=num(s.demos);
-  document.getElementById('kFollowups').textContent=num(s.followups)+' seguimientos';
-  document.getElementById('kRevenuePerVisit').textContent=money(s.revenue_per_visit);
-  document.getElementById('kUsers').textContent=num(s.active_users);
-  document.getElementById('kOpenDeals').textContent=num(s.open_deals);
-  document.getElementById('kFollowupsToday').textContent=num(s.followups_today);
-  document.getElementById('kOverdue').textContent=num(s.overdue_followups);
-  document.getElementById('kStale').textContent=num(s.stale_active_leads);
-  document.getElementById('avgOpenAge').textContent=(s.avg_open_age_days||0)+' días';
-  document.getElementById('qWinRate').textContent=pct(s.decision_win_rate_pct);
-  document.getElementById('qDaysToSale').textContent=Number(s.avg_days_to_sale||0).toFixed(1).replace('.0','');
-  document.getElementById('qFollowScheduled').textContent=pct(s.followup_scheduled_pct);
-  document.getElementById('qFollowOverdue').textContent=pct(s.followup_overdue_pct);
-  document.getElementById('qCoverage').textContent=pct(s.territory_coverage_pct);
-  document.getElementById('qCoverageCount').textContent=num(s.covered_postal_codes)+' / '+num(s.territory_total_postal_codes)+' CP';
-  document.getElementById('qRevenueVisit').textContent=money(s.revenue_per_visit);
-  renderAttention();
-  renderInsights();
-  renderPipelineAging();
+  document.getElementById('kSales').textContent=num(s.sales);
+  document.getElementById('kAvgTicket').textContent='Ticket '+money(s.avg_ticket)+(deltaText('sales')||'');
+  document.getElementById('kRevenue').textContent=money(s.revenue);
+  document.getElementById('kUnits').textContent=num(s.units)+' NFC vendidos'+(deltaText('revenue')||'');
+  document.getElementById('kPortfolioConversion').textContent=pct(s.portfolio_conversion_pct);
 
   const total=Math.max(1,s.leads_total||0);
   document.getElementById('statusFunnel').innerHTML=(analytics.statuses||[]).map(function(x){
@@ -350,12 +331,12 @@ function renderDashboard(){
   const days=(analytics.daily||[]).slice(-14);
   const maxRevenue=Math.max.apply(null,[1].concat(days.map(function(x){return x.revenue||0})));
   document.getElementById('dailyTrend').innerHTML=days.map(function(x){
-    return '<div class="trend-row"><span>'+x.date.slice(5)+'</span><div class="trend-bar"><i style="width:'+Math.max(2,(x.revenue/maxRevenue)*100)+'%"></i></div><small>L '+x.leads+' · V '+x.visits+' · ✓ '+x.sales+'</small><b>'+money(x.revenue)+'</b></div>';
+    return '<div class="trend-row"><span>'+x.date.slice(5)+'</span><div class="trend-bar"><i style="width:'+Math.max(2,(x.revenue/maxRevenue)*100)+'%"></i></div><small>D '+x.leads+' · V '+x.visits+' · ✓ '+x.sales+'</small><b>'+money(x.revenue)+'</b></div>';
   }).join('')||'<p class="empty">Sin actividad todavía.</p>';
 
   const globalRep=document.getElementById('globalRep')?.value||'';
   const repRows=(analytics.reps||[]).filter(function(r){return r.role!=='admin'&&(!globalRep||String(r.id)===String(globalRep))});
-  document.getElementById('repPerformance').innerHTML=repRows.map(repRow).join('')||'<tr><td colspan="15">Sin datos para este segmento.</td></tr>';
+  document.getElementById('repPerformance').innerHTML=repRows.map(repRow).join('')||'<tr><td colspan="8">Sin datos para este segmento.</td></tr>';
   renderPostalRanking();
   renderMiniRanking('categoryTop',analytics.categories||[],'category');
 }
@@ -414,7 +395,7 @@ function renderMiniRanking(id,rows,key){
 }
 
 function metricCells(x){
-  return '<td>'+num(x.leads)+'</td><td>'+num(x.won)+'</td><td>'+num(x.visits)+'</td><td>'+num(x.demos)+'</td><td>'+num(x.followups)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+pct(x.conversion_pct)+'</td><td>'+pct(x.sale_per_visit_pct)+'</td><td>'+money(x.avg_ticket)+'</td><td>'+money(x.revenue_per_lead)+'</td><td><b>'+money(x.revenue)+'</b></td>';
+  return '<td>'+num(x.leads)+'</td><td>'+num(x.won)+'</td><td>'+num(x.visits)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+pct(x.conversion_pct)+'</td><td>'+pct(x.sale_per_visit_pct)+'</td><td>'+money(x.avg_ticket)+'</td><td>'+money(x.revenue_per_lead)+'</td><td><b>'+money(x.revenue)+'</b></td>';
 }
 function renderPostalTable(){
   const q=(document.getElementById('postalSearch')?document.getElementById('postalSearch').value:'').trim().toLowerCase();
@@ -439,7 +420,7 @@ function renderCategoryTable(){
   }).join('')||'<tr><td colspan="9">Sin datos.</td></tr>';
 }
 function repRow(r){
-  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td><span class="'+(r.overdue_followups?'risk-num':'')+'">'+num(r.overdue_followups)+'</span></td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+pct(r.sale_per_visit_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td>'+dateText(r.last_activity_at)+'</td></tr>';
+  return '<tr><td><b>'+esc(r.email)+'</b><small class="subline">'+esc(r.role)+'</small></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td></tr>';
 }
 function renderTeam(){
   document.getElementById('teamTable').innerHTML=(analytics.reps||[]).map(function(r){
@@ -447,7 +428,7 @@ function renderTeam(){
     if(r.role!=='admin'){
       buttons='<button data-email="'+esc(r.email)+'" onclick="resetRepPassword('+r.id+',this.dataset.email)">Contraseña</button><button class="'+(r.is_active?'danger':'')+'" onclick="toggleRep('+r.id+','+(!r.is_active)+')">'+(r.is_active?'Pausar':'Activar')+'</button>';
     }
-    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.won)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.demos)+'</td><td>'+num(r.followups)+'</td><td><span class="'+(r.overdue_followups?'risk-num':'')+'">'+num(r.overdue_followups)+'</span></td><td>'+num(r.sales)+'</td><td>'+num(r.units)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td>'+dateText(r.last_activity_at)+'</td><td><div class="actions">'+buttons+'</div></td></tr>';
+    return '<tr><td><b>'+esc(r.email)+'</b></td><td>'+esc(r.role)+'</td><td><span class="status '+(r.is_active?'on':'off')+'">'+(r.is_active?'Activo':'Pausado')+'</span></td><td>'+num(r.leads)+'</td><td>'+num(r.open_leads)+'</td><td>'+num(r.visits)+'</td><td>'+num(r.sales)+'</td><td>'+pct(r.conversion_pct)+'</td><td>'+money(r.avg_ticket)+'</td><td><b>'+money(r.revenue)+'</b></td><td><div class="actions">'+buttons+'</div></td></tr>';
   }).join('');
 }
 function renderActivity(){
@@ -476,10 +457,10 @@ async function loadAdminLeads(reset){
   document.getElementById('leadCountLabel').textContent=num(data.total_filtered)+' negocios con los filtros actuales.';
   const html=data.items.map(function(x){
     const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'—');
-    return '<tr><td><b>'+esc(x.name)+'</b><small class="subline">'+esc(x.address||'Sin dirección')+'</small></td><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td><td>'+esc(x.business_type)+'<small class="subline">'+esc(x.business_subtype||'—')+'</small></td><td>'+esc(x.rep_email||'Sin asignar')+'</td><td><span class="badge">'+esc(statusLabel(x.status))+'</span></td><td>'+num(x.visits)+'</td><td>'+num(x.demos)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+money(x.avg_ticket)+'</td><td><b>'+money(x.revenue)+'</b></td><td>'+esc(x.owner_name||'—')+'<small class="subline">'+esc(x.phone||'')+'</small></td><td>'+esc(next)+'</td><td>'+dateText(x.updated_at)+'</td></tr>';
+    return '<tr><td><b>'+esc(x.name)+'</b><small class="subline">'+esc(x.address||'Sin dirección')+'</small></td><td><b>'+esc(x.postal_code)+'</b></td><td><b>'+esc(x.zone_short||postalInfo(x.postal_code).zone_short)+'</b><small class="subline zone-full">'+esc(x.zone_label||postalInfo(x.postal_code).zone_label)+'</small></td><td>'+esc(x.business_type)+'<small class="subline">'+esc(x.business_subtype||'—')+'</small></td><td>'+esc(x.rep_email||'Sin asignar')+'</td><td><span class="badge">'+esc(statusLabel(x.status))+'</span></td><td>'+num(x.visits)+'</td><td>'+num(x.sales)+'</td><td>'+num(x.units)+'</td><td>'+money(x.avg_ticket)+'</td><td><b>'+money(x.revenue)+'</b></td><td>'+esc(x.owner_name||'—')+'<small class="subline">'+esc(x.phone||'')+'</small></td><td>'+esc(next)+'</td><td>'+dateText(x.updated_at)+'</td></tr>';
   }).join('');
   const body=document.getElementById('businessTable');
-  if(reset)body.innerHTML=html||'<tr><td colspan="15">No hay negocios con estos filtros.</td></tr>';else body.insertAdjacentHTML('beforeend',html);
+  if(reset)body.innerHTML=html||'<tr><td colspan="14">No hay negocios con estos filtros.</td></tr>';else body.insertAdjacentHTML('beforeend',html);
   document.getElementById('adminLoadMore').classList.toggle('hidden',!adminLeadCursor);
 }
 function clearLeadFilters(){
@@ -514,10 +495,10 @@ async function exportVisibleBusinesses(){
     }while(cursor&&guard<100);
   }catch(ex){alert('No se pudo preparar el CSV: '+ex.message);return}
   if(!rows.length){alert('No hay negocios con estos filtros.');return}
-  const head=['Negocio','Dirección','CP','Barrio / zona','Categoría','Tipo','Comercial','Estado','Visitas','Demos','Ventas','Unidades','Ticket','Facturación','Contacto','Teléfono','Próxima acción','Actualizado'];
+  const head=['Negocio','Dirección','CP','Barrio / zona','Categoría','Tipo','Comercial','Estado','Visitas','Ventas','Unidades','Ticket','Facturación','Contacto','Teléfono','Próxima acción','Actualizado'];
   const body=rows.map(function(x){
     const next=x.follow_up_at?'Seguimiento '+dateText(x.follow_up_at):(x.next_action||'');
-    return [x.name,x.address,x.postal_code,x.zone_label||x.zone_short,x.business_type,x.business_subtype,x.rep_email,statusLabel(x.status),x.visits,x.demos,x.sales,x.units,x.avg_ticket,x.revenue,x.owner_name,x.phone,next,dateText(x.updated_at)];
+    return [x.name,x.address,x.postal_code,x.zone_label||x.zone_short,x.business_type,x.business_subtype,x.rep_email,statusLabel(x.status),x.visits,x.sales,x.units,x.avg_ticket,x.revenue,x.owner_name,x.phone,next,dateText(x.updated_at)];
   });
   const csv='\uFEFF'+[head].concat(body).map(function(r){return r.map(csvCell).join(';')}).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
