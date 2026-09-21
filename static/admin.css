@@ -62,3 +62,11 @@ main{padding:22px;min-width:0;max-width:1700px;width:100%;margin:0 auto}header{d
 .executive-table{min-width:820px}
 @media(max-width:1050px){.executive-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.executive-kpis{grid-template-columns:1fr 1fr}}
+
+.stock-kpi{position:relative}
+.stock-kpi .stock-action{position:absolute;right:12px;bottom:10px;border:0;background:#eef5ff;color:#0d64dc;border-radius:8px;padding:6px 8px;font-size:8px;font-weight:900;cursor:pointer}
+.stock-kpi.stock-low{border-color:#f0d69a;background:#fffaf0}
+.stock-kpi.stock-low>b{color:#9c6500}
+.stock-kpi.stock-empty{border-color:#efc3ca;background:#fff6f7}
+.stock-kpi.stock-empty>b{color:#b73547}
+.stock-kpi.stock-empty .stock-action{background:#fdecef;color:#b73547}
