@@ -79,6 +79,9 @@ def startup():
             try:
                 conn.execute(text('ALTER TABLE leads ADD COLUMN IF NOT EXISTS follow_up_at TIMESTAMPTZ NULL'))
                 conn.execute(text('CREATE INDEX IF NOT EXISTS ix_leads_follow_up_at ON leads (follow_up_at)'))
+            except Exception:
+                pass
+            try:
                 conn.execute(text('CREATE EXTENSION IF NOT EXISTS pg_trgm'))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_leads_name_trgm ON leads USING gin (lower(name) gin_trgm_ops)"))
                 conn.execute(text("CREATE INDEX IF NOT EXISTS ix_leads_subtype_trgm ON leads USING gin (lower(coalesce(business_subtype,'')) gin_trgm_ops)"))
@@ -121,15 +124,32 @@ def me(user:User=Depends(current_user)):
 
 @app.get('/api/metrics')
 def metrics(user:User=Depends(current_user),db:Session=Depends(get_db)):
-    today=utcnow().replace(hour=0,minute=0,second=0,microsecond=0)
-    visits=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type.in_(['visit','demo','follow_up','owner_absent','closed','no_interest']),Activity.created_at>=today)) or 0
-    demos=db.scalar(select(func.count()).select_from(Activity).where(Activity.actor_user_id==user.id,Activity.activity_type=='demo',Activity.created_at>=today)) or 0
-    sales=db.scalar(select(func.count()).select_from(Sale).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
-    revenue=db.scalar(select(func.coalesce(func.sum(Sale.total),0)).where(Sale.actor_user_id==user.id,Sale.created_at>=today)) or 0
     madrid=ZoneInfo('Europe/Madrid')
     now_local=datetime.now(madrid)
     day_start=datetime.combine(now_local.date(),time.min,tzinfo=madrid).astimezone(timezone.utc)
     day_end=datetime.combine(now_local.date(),time.max,tzinfo=madrid).astimezone(timezone.utc)
+    visits=db.scalar(select(func.count()).select_from(Activity).where(
+        Activity.actor_user_id==user.id,
+        Activity.activity_type.in_(['visit','demo','follow_up','owner_absent','closed','no_interest']),
+        Activity.created_at>=day_start,
+        Activity.created_at<=day_end
+    )) or 0
+    demos=db.scalar(select(func.count()).select_from(Activity).where(
+        Activity.actor_user_id==user.id,
+        Activity.activity_type=='demo',
+        Activity.created_at>=day_start,
+        Activity.created_at<=day_end
+    )) or 0
+    sales=db.scalar(select(func.count()).select_from(Sale).where(
+        Sale.actor_user_id==user.id,
+        Sale.created_at>=day_start,
+        Sale.created_at<=day_end
+    )) or 0
+    revenue=db.scalar(select(func.coalesce(func.sum(Sale.total),0)).where(
+        Sale.actor_user_id==user.id,
+        Sale.created_at>=day_start,
+        Sale.created_at<=day_end
+    )) or 0
     followups=list(db.scalars(
         select(Lead)
         .where(
