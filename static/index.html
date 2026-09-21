@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Revify CRM · Comercial</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260921-1725">
+  <link rel="stylesheet" href="/static/style.css?v=20260921-1845">
 </head>
 <body>
   <div class="phone">
@@ -44,6 +44,10 @@
             <div class="progress-copy"><b id="progress-text">0 de 10 ventas</b><span>Objetivo diario</span></div>
           </div>
         </div>
+        <div class="card followups-card">
+          <div class="followups-head"><div><b>Seguimientos de hoy</b><small>No dejes escapar los negocios que toca recuperar</small></div><span id="followupsCount">0</span></div>
+          <div id="followupsToday"></div>
+        </div>
         <div class="banner"><b>“Más reseñas.<br>Más negocios.”</b><div class="brand2">R <span>Revify</span></div></div>
         <div class="section">
           <div class="section-head"><div><h4>Qué trabajar ahora</h4><small>La oportunidad prioritaria del momento</small></div><button class="linkbtn" onclick="showLeads()">Ver cartera</button></div>
@@ -54,7 +58,7 @@
               <div style="font-size:22px;color:#7b8aa2">›</div>
             </div>
             <div class="work-actions">
-              <button class="ghostbtn">Ir</button>
+              <button class="ghostbtn" onclick="mapPriorityLead()">Ir</button>
               <button class="softbtn" onclick="priorityLead&&openLead(priorityLead.id)">Registrar</button>
               <button class="primarybtn" onclick="showCreate()">Dar de alta</button>
             </div>
@@ -118,6 +122,11 @@
                 <option value="lost">No vendido</option>
                 <option value="won">✅ Vendido — registrar venta</option>
               </select>
+            </div>
+
+            <div class="create-field full" id="createFollowUpFields" style="display:none">
+              <label>FECHA Y HORA DEL SEGUIMIENTO *</label>
+              <input id="newFollowUpAt" type="datetime-local">
             </div>
 
             <div class="create-field full" id="createSaleFields" style="display:none">
@@ -195,6 +204,6 @@
     </nav>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/app.js?v=20260921-1800"></script>
+  <script src="/static/app.js?v=20260921-1845"></script>
 </body>
 </html>
