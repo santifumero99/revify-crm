@@ -317,6 +317,7 @@ async function saveLead(e){
     business_subtype:document.getElementById('newBusinessSubtype').value.trim(),
     owner_name:document.getElementById('newOwner').value.trim(),
     phone:document.getElementById('newPhone').value.trim(),
+    initial_notes:document.getElementById('newNotes').value.trim(),
     status
   };
   if(payload.postal_code.length!==5){toast('Código postal de 5 dígitos');return}
