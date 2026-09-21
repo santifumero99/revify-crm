@@ -123,10 +123,9 @@ def _decode_cursor(cursor: str):
 def _period_start(days: int):
     if days <= 0:
         return None
-    now = utcnow()
     if days == 1:
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
-    return now - timedelta(days=days)
+        return madrid_day_bounds()[0]
+    return utcnow() - timedelta(days=days)
 
 def _merge_breakdown(base_rows, activity_rows, sale_rows, key_name):
     merged = {}
