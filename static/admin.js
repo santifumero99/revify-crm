@@ -87,6 +87,7 @@ async function loadAnalytics(){
   analytics=await req('/admin/analytics?'+params.toString());
   reps=analytics.reps||[];
   renderPostalSegment();
+  updatePostalHint();
   renderDashboard();renderCategoryKpis();renderPostalTable();renderCategoryTable();renderTeam();renderActivity();renderRepFilters();
   if(document.getElementById('tab-leads')&&!document.getElementById('tab-leads').classList.contains('hidden'))loadAdminLeads(true);
 }
@@ -156,12 +157,13 @@ function renderAttention(){
   const rows=analytics.attention||[];
   box.innerHTML=rows.map(function(x){
     const when=x.reason==='Seguimiento vencido'?(x.follow_up_at?'Programado '+dateText(x.follow_up_at):'Seguimiento pendiente'):'Último movimiento '+dateText(x.updated_at);
-    return '<button class="attention-row" onclick="openAttentionLead('+x.id+')"><span class="attention-flag '+(x.reason==='Seguimiento vencido'?'overdue':'stale')+'"></span><span><b>'+esc(x.name)+'</b><small>'+esc(x.postal_code)+' · '+esc(x.zone_short)+' · '+esc(x.rep_email)+'</small></span><span><b>'+esc(x.reason)+'</b><small>'+esc(when)+'</small></span><em>›</em></button>';
+    return '<button class="attention-row" data-name="'+esc(x.name)+'" onclick="focusAttentionLead(this.dataset.name)"><span class="attention-flag '+(x.reason==='Seguimiento vencido'?'overdue':'stale')+'"></span><span><b>'+esc(x.name)+'</b><small>'+esc(x.postal_code)+' · '+esc(x.zone_short)+' · '+esc(x.rep_email)+'</small></span><span><b>'+esc(x.reason)+'</b><small>'+esc(when)+'</small></span><em>›</em></button>';
   }).join('')||'<div class="attention-empty">No hay oportunidades pendientes de atención especial.</div>';
 }
-function openAttentionLead(id){
+function focusAttentionLead(name){
   showTab('leads');
-  const search=document.getElementById('fSearch');if(search)search.value=String(id);
+  const search=document.getElementById('fSearch');
+  if(search){search.value=name;loadAdminLeads(true)}
 }
 function renderMiniRanking(id,rows,key){
   const top=rows.slice(0,6);
