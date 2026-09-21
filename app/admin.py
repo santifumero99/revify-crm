@@ -894,8 +894,8 @@ def admin_analytics(
     if territory_coverage_pct<100:
         insights.append({
             "level":"info",
-            "title":f"Cobertura territorial: {territory_coverage_pct:.1f}% de los CP de Barcelona",
-            "body":f"{territory_total-len(covered_cps)} CP todavía sin ningún deal registrado."
+            "title":f"Cobertura territorial objetivo: {territory_coverage_pct:.1f}%",
+            "body":f"{territory_total-len(covered_cps)} CP de Barcelona + Sant Cugat + Rubí todavía sin ningún deal registrado."
         })
     insights=insights[:6]
 
