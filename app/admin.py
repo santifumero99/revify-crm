@@ -389,6 +389,7 @@ def admin_analytics(
             func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
             func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
             func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+            func.count(func.distinct(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), Activity.lead_id), else_=None))),
         )
         .select_from(Activity)
     )
@@ -429,6 +430,7 @@ def admin_analytics(
     visits = int(activity_totals[1] or 0)
     demos = int(activity_totals[2] or 0)
     followups = int(activity_totals[3] or 0)
+    visited_businesses = int(activity_totals[4] or 0)
     sales_total = db.execute(sales_period_q).one()
     sales = int(sales_total[0] or 0)
     units = int(sales_total[1] or 0)
@@ -520,6 +522,7 @@ def admin_analytics(
                 func.sum(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), 1), else_=0)),
                 func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
                 func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+                func.count(func.distinct(case((Activity.activity_type.in_(VISIT_ACTIVITY_TYPES), Activity.lead_id), else_=None))),
             )
             .select_from(Activity)
             .join(Lead, Lead.id == Activity.lead_id)
@@ -750,6 +753,7 @@ def admin_analytics(
         rep_sales = int(sr[0] or 0)
         rep_revenue = float(sr[2] or 0)
         rep_visits = int(ar[0] or 0)
+        rep_visited_businesses = int(ar[3] or 0)
         is_admin = u.role == "admin" or u.email.lower() == ADMIN_EMAIL
         reps.append({
             "id": u.id,
@@ -762,13 +766,14 @@ def admin_analytics(
             "overdue_followups":int(overdue_rep),
             "last_activity_at":last_activity.isoformat() if last_activity else None,
             "visits": rep_visits,
+            "visited_businesses":rep_visited_businesses,
             "demos": int(ar[1] or 0),
             "followups": int(ar[2] or 0),
             "sales": rep_sales,
             "units": int(sr[1] or 0),
             "revenue": rep_revenue,
             "conversion_pct": round((won / leads * 100), 1) if leads else 0,
-            "sale_per_visit_pct": round((rep_sales / rep_visits * 100), 1) if rep_visits else 0,
+            "sale_per_visit_pct": round((rep_sales / rep_visited_businesses * 100), 1) if rep_visited_businesses else 0,
             "avg_ticket": round((rep_revenue / rep_sales), 2) if rep_sales else 0,
         })
 
@@ -917,13 +922,14 @@ def admin_analytics(
             "new_leads": int(new_leads),
             "activities": activity_count,
             "visits": visits,
+            "visited_businesses":visited_businesses,
             "demos": demos,
             "followups": followups,
             "sales": sales,
             "units": units,
             "revenue": revenue,
             "avg_ticket": round((revenue / sales), 2) if sales else 0,
-            "sale_per_visit_pct": round((sales / visits * 100), 1) if visits else 0,
+            "sale_per_visit_pct": round((sales / visited_businesses * 100), 1) if visited_businesses else 0,
             "revenue_per_visit": round((revenue / visits), 2) if visits else 0,
             "revenue_per_lead": round((revenue / lead_count), 2) if lead_count else 0,
             "decision_win_rate_pct":decision_win_rate_pct,
