@@ -192,7 +192,9 @@ function editStatusOptions(selected,locked=false){
 function toggleEditSaleFields(originalStatus){
   const status=document.getElementById('editStatus')?.value;
   const box=document.getElementById('editSaleFields');
+  const follow=document.getElementById('editFollowUpFields');
   if(box)box.style.display=(status==='won'&&originalStatus!=='won')?'block':'none';
+  if(follow)follow.style.display=status==='follow_up'?'block':'none';
   calcEditSaleTotal();
 }
 function calcEditSaleTotal(){
@@ -214,6 +216,7 @@ async function editLead(id){
       <div class="create-field"><label>CONTACTO / DUEÑO</label><input id="editOwner" value="${escapeHtml(x.owner_name||'')}"></div>
       <div class="create-field"><label>TELÉFONO</label><input id="editPhone" inputmode="tel" value="${escapeHtml(x.phone||'')}"></div>
       <div class="create-field full"><label>ESTADO ACTUAL *</label><select id="editStatus" ${locked?'disabled':''} onchange="toggleEditSaleFields('${x.status}')">${editStatusOptions(x.status,locked)}</select></div>
+      <div class="create-field full" id="editFollowUpFields" style="display:none"><label>FECHA Y HORA DEL SEGUIMIENTO *</label><input id="editFollowUpAt" type="datetime-local" value="${localInputValue(x.follow_up_at)}"></div>
       <div class="create-field full" id="editSaleFields" style="display:none"><div style="border:1px solid #dfe7f1;border-radius:12px;padding:9px;background:#f8fbff"><div style="font-size:11px;font-weight:900;color:#17365f;margin-bottom:3px">VENTA</div><div style="font-size:9px;color:#64748b;margin-bottom:10px">Este mismo deal pasará a Vendido y la venta aparecerá en Ventas.</div><div class="create-grid">
         <div class="create-field"><label>UNIDADES NFC</label><input id="editSaleQuantity" type="number" min="1" max="1000" value="1" oninput="calcEditSaleTotal()"></div>
         <div class="create-field"><label>PRECIO UNITARIO (€)</label><input id="editSaleUnitPrice" type="number" min="0.01" step="0.01" value="25.00" oninput="calcEditSaleTotal()"></div>
@@ -239,6 +242,11 @@ async function saveLeadEdit(e,id,originalStatus){
     status
   };
   if(payload.postal_code.length!==5){toast('Código postal de 5 dígitos');return}
+  if(status==='follow_up'){
+    const v=document.getElementById('editFollowUpAt')?.value;
+    if(!v){toast('Indica fecha y hora de seguimiento');return}
+    payload.follow_up_at=new Date(v).toISOString();
+  }
   if(status==='won'&&originalStatus!=='won'){
     payload.sale_quantity=Math.max(1,Number(document.getElementById('editSaleQuantity').value||1));
     payload.sale_unit_price=Math.max(.01,Number(document.getElementById('editSaleUnitPrice').value||25));
