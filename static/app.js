@@ -158,15 +158,26 @@ function mapCurrentLead(){
 }
 function showVisitForm(id){
   const box=document.getElementById('visitPanel');if(!box)return;
-  box.innerHTML=`<form class="visit-form" onsubmit="saveVisit(event,${id})"><div class="visit-title">Registrar nueva visita</div><label>RESULTADO</label><select id="visitStatus"><option value="pending">Pendiente / en curso</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="lost">No vendido</option></select><label>NOTA DE LA VISITA</label><textarea id="visitNotes" rows="3" placeholder="Ej. Hablar con Marta el jueves; interesada en 2 unidades..."></textarea><div class="visit-actions"><button type="button" onclick="document.getElementById('visitPanel').innerHTML=''">Cancelar</button><button class="blue">Guardar visita</button></div><small>Si ha comprado, usa “Editar deal” → Vendido para registrar también la venta.</small></form>`;
+  box.innerHTML=`<form class="visit-form" onsubmit="saveVisit(event,${id})"><div class="visit-title">Registrar nueva visita</div><label>RESULTADO</label><select id="visitStatus" onchange="toggleVisitFollowUp()"><option value="pending">Pendiente / en curso</option><option value="owner_absent">No está el dueño</option><option value="closed">Local cerrado</option><option value="follow_up">Seguimiento</option><option value="lost">No vendido</option></select><div id="visitFollowUpFields" style="display:none"><label>FECHA Y HORA DEL SEGUIMIENTO *</label><input id="visitFollowUpAt" type="datetime-local"></div><label>NOTA DE LA VISITA</label><textarea id="visitNotes" rows="3" placeholder="Ej. Hablar con Marta el jueves; interesada en 2 unidades..."></textarea><div class="visit-actions"><button type="button" onclick="document.getElementById('visitPanel').innerHTML=''">Cancelar</button><button class="blue">Guardar visita</button></div><small>Si ha comprado, usa “Editar deal” → Vendido para registrar también la venta.</small></form>`;
+}
+function toggleVisitFollowUp(){
+  const on=document.getElementById('visitStatus')?.value==='follow_up';
+  const box=document.getElementById('visitFollowUpFields');
+  if(box)box.style.display=on?'block':'none';
 }
 async function saveVisit(e,id){
   e.preventDefault();
   const status=document.getElementById('visitStatus').value;
   const notes=document.getElementById('visitNotes').value.trim();
   const type={pending:'visit',owner_absent:'owner_absent',closed:'closed',follow_up:'follow_up',lost:'no_interest'}[status]||'visit';
+  const patch={status};
+  if(status==='follow_up'){
+    const v=document.getElementById('visitFollowUpAt')?.value;
+    if(!v){toast('Indica fecha y hora de seguimiento');return}
+    patch.follow_up_at=new Date(v).toISOString();
+  }
   try{
-    await api('/leads/'+id,{method:'PATCH',body:JSON.stringify({status})});
+    await api('/leads/'+id,{method:'PATCH',body:JSON.stringify(patch)});
     await api('/leads/'+id+'/activities',{method:'POST',body:JSON.stringify({activity_type:type,notes})});
     toast('Visita registrada');
     await openLead(id);
@@ -270,9 +281,11 @@ async function cycleStatus(id,current){
 
 
 function toggleCreateSaleFields(){
-  const won=document.getElementById('newStatus')?.value==='won';
+  const status=document.getElementById('newStatus')?.value;
   const box=document.getElementById('createSaleFields');
-  if(box) box.style.display=won?'block':'none';
+  const follow=document.getElementById('createFollowUpFields');
+  if(box) box.style.display=status==='won'?'block':'none';
+  if(follow) follow.style.display=status==='follow_up'?'block':'none';
 }
 function calcCreateSaleTotal(){
   const q=Math.max(1,Number(document.getElementById('newSaleQuantity')?.value||1));
@@ -294,6 +307,11 @@ async function saveLead(e){
     status
   };
   if(payload.postal_code.length!==5){toast('Código postal de 5 dígitos');return}
+  if(status==='follow_up'){
+    const v=document.getElementById('newFollowUpAt')?.value;
+    if(!v){toast('Indica fecha y hora de seguimiento');return}
+    payload.follow_up_at=new Date(v).toISOString();
+  }
   if(status==='won'){
     payload.sale_quantity=Math.max(1,Number(document.getElementById('newSaleQuantity').value||1));
     payload.sale_unit_price=Math.max(.01,Number(document.getElementById('newSaleUnitPrice').value||25));
