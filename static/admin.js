@@ -121,6 +121,7 @@ function mapMetricValue(row){
   row=row||{};
   if(mapMetric==='leads')return Number(row.leads||0);
   if(mapMetric==='sales')return Number(row.sales||0);
+  if(mapMetric==='followups')return Number(row.followups||0);
   if(mapMetric==='revenue')return Number(row.revenue||0);
   if(mapMetric==='conversion')return Number(row.sale_per_visit_pct||row.conversion_pct||0);
   return Number(row.visits||0);
@@ -129,6 +130,7 @@ function mapMetricLabel(row){
   row=row||{};
   if(mapMetric==='leads')return num(row.leads||0)+' negocios';
   if(mapMetric==='sales')return num(row.sales||0)+' ventas';
+  if(mapMetric==='followups')return num(row.followups||0)+' seguimientos';
   if(mapMetric==='revenue')return money(row.revenue||0);
   if(mapMetric==='conversion')return pct(row.sale_per_visit_pct||row.conversion_pct||0);
   return num(row.visits||0)+' visitas';
@@ -261,7 +263,7 @@ async function searchMapAddress(){
   if(q.length<3){return}
   box.classList.remove('hidden');box.innerHTML='<div class="map-search-loading">Buscando dirección…</div>';
   try{
-    const data=await req('/address-resolve?q='+encodeURIComponent(q));
+    const data=await req('/admin/address-resolve?q='+encodeURIComponent(q));
     mapSearchResults=data.items||[];
     box.innerHTML=mapSearchResults.length?mapSearchResults.map(function(x,i){
       const sub=[x.postal_code,x.municipality,x.neighborhood||x.zone_short].filter(Boolean).join(' · ');
