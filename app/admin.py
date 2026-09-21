@@ -1,7 +1,8 @@
 import os
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -23,6 +24,69 @@ STATUS_LABELS = {
     "won": "Vendido",
     "lost": "No interesado",
 }
+
+VISIT_ACTIVITY_TYPES = {"visit","demo","follow_up","owner_absent","closed","no_interest"}
+
+POSTAL_ZONE_MAP = {
+    "08001": "el Raval",
+    "08002": "el Barri Gòtic",
+    "08003": "la Barceloneta · Sant Pere, Santa Caterina i la Ribera",
+    "08004": "el Poble-sec · la Font de la Guatlla",
+    "08005": "Diagonal Mar i el Front Marítim del Poblenou · el Parc i la Llacuna del Poblenou · el Poblenou · la Vila Olímpica del Poblenou",
+    "08006": "el Putxet i el Farró · la Vila de Gràcia · Sant Gervasi-Galvany",
+    "08007": "l'Antiga Esquerra de l'Eixample · la Dreta de l'Eixample",
+    "08008": "l'Antiga Esquerra de l'Eixample · la Dreta de l'Eixample",
+    "08009": "la Dreta de l'Eixample",
+    "08010": "la Dreta de l'Eixample",
+    "08011": "l'Antiga Esquerra de l'Eixample · Sant Antoni",
+    "08012": "la Vila de Gràcia",
+    "08013": "el Fort Pienc · la Dreta de l'Eixample · la Sagrada Família",
+    "08014": "Hostafrancs · la Bordeta · les Corts · Sants",
+    "08015": "la Nova Esquerra de l'Eixample · Sant Antoni",
+    "08016": "la Prosperitat · Porta · Vilapicina i la Torre Llobeta",
+    "08017": "les Tres Torres · Sant Gervasi-Galvany · Sant Gervasi-la Bonanova · Sarrià · Vallvidrera, el Tibidabo i les Planes",
+    "08018": "el Clot · el Fort Pienc · el Parc i la Llacuna del Poblenou · el Poblenou · Provençals del Poblenou · Sant Martí de Provençals",
+    "08019": "Diagonal Mar i el Front Marítim del Poblenou · el Besòs i el Maresme · Provençals del Poblenou",
+    "08020": "la Verneda i la Pau · Provençals del Poblenou · Sant Martí de Provençals",
+    "08021": "Sant Gervasi-Galvany",
+    "08022": "el Putxet i el Farró · Sant Gervasi-la Bonanova",
+    "08023": "el Coll · el Putxet i el Farró · la Salut · Vallcarca i els Penitents",
+    "08024": "Can Baró · el Baix Guinardó · el Camp d'en Grassot i Gràcia Nova · la Salut · la Vila de Gràcia",
+    "08025": "el Baix Guinardó · el Camp d'en Grassot i Gràcia Nova · la Sagrada Família",
+    "08026": "el Camp de l'Arpa del Clot · el Clot",
+    "08027": "el Congrés i els Indians · la Sagrera · Navas",
+    "08028": "la Maternitat i Sant Ramon · les Corts · Sants · Sants-Badal",
+    "08029": "la Nova Esquerra de l'Eixample · les Corts",
+    "08030": "Baró de Viver · el Bon Pastor · Sant Andreu",
+    "08031": "Can Peguera · el Turó de la Peira · Horta · Vilapicina i la Torre Llobeta",
+    "08032": "Can Baró · el Carmel · el Guinardó · Horta · la Clota · la Font d'en Fargues · la Teixonera",
+    "08033": "Ciutat Meridiana · la Trinitat Nova · la Trinitat Vella · les Roquetes · Torre Baró · Vallbona",
+    "08034": "Pedralbes · Sarrià",
+    "08035": "el Coll · Horta · la Clota · la Teixonera · la Vall d'Hebron · Montbau · Sant Genís dels Agudells · Sant Gervasi-la Bonanova · Vallcarca i els Penitents · Vallvidrera, el Tibidabo i les Planes",
+    "08036": "l'Antiga Esquerra de l'Eixample",
+    "08037": "el Camp d'en Grassot i Gràcia Nova · la Dreta de l'Eixample",
+    "08038": "el Poble-sec · la Marina de Port · la Marina del Prat Vermell",
+    "08039": "Barcelona — zona postal especial",
+    "08040": "la Marina del Prat Vermell",
+    "08041": "el Camp de l'Arpa del Clot · el Guinardó · Navas",
+    "08042": "Can Peguera · Canyelles · la Guineueta · la Trinitat Nova · les Roquetes · Verdun",
+}
+
+def postal_zone(postal_code: str):
+    cp=(postal_code or "").strip()
+    label=POSTAL_ZONE_MAP.get(cp)
+    if not label:
+        return {"postal_code":cp,"zone_label":"Fuera del directorio Barcelona","zone_short":"Fuera de Barcelona / sin zona"}
+    parts=[p.strip() for p in label.split(" · ") if p.strip()]
+    short=parts[0] if len(parts)==1 else (parts[0]+" · "+parts[1]+(f" +{len(parts)-2}" if len(parts)>2 else ""))
+    return {"postal_code":cp,"zone_label":label,"zone_short":short}
+
+def madrid_day_bounds():
+    madrid=ZoneInfo("Europe/Madrid")
+    now=datetime.now(madrid)
+    start=datetime.combine(now.date(),time.min,tzinfo=madrid).astimezone(timezone.utc)
+    end=datetime.combine(now.date(),time.max,tzinfo=madrid).astimezone(timezone.utc)
+    return start,end
 
 def require_admin(user: User = Depends(current_user)) -> User:
     if user.role != "admin" and user.email.lower() != ADMIN_EMAIL:
