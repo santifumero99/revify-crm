@@ -318,6 +318,13 @@ function renderDashboard(){
   document.getElementById('kRevenue').textContent=money(s.revenue);
   document.getElementById('kUnits').textContent=num(s.units)+' NFC vendidos'+(deltaText('revenue')||'');
   document.getElementById('kPortfolioConversion').textContent=pct(s.portfolio_conversion_pct);
+  document.getElementById('kStock').textContent=num(s.stock_available);
+  document.getElementById('kStockDetail').textContent=num(s.stock_units_added)+' añadidas · '+num(s.sold_units_total)+' vendidas';
+  const stockCard=document.getElementById('stockKpi');
+  if(stockCard){
+    stockCard.classList.toggle('stock-low',Number(s.stock_available||0)<=20);
+    stockCard.classList.toggle('stock-empty',Number(s.stock_available||0)<=0);
+  }
 
   const total=Math.max(1,s.leads_total||0);
   document.getElementById('statusFunnel').innerHTML=(analytics.statuses||[]).map(function(x){
@@ -500,6 +507,28 @@ async function exportVisibleBusinesses(){
   const csv='\uFEFF'+[head].concat(body).map(function(r){return r.map(csvCell).join(';')}).join('\n');
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revify-negocios-'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},500);
+}
+
+function openStockModal(){
+  document.getElementById('stockModal').classList.remove('hidden');
+  document.getElementById('stockQuantity').value='';
+  document.getElementById('stockNote').value='';
+  document.getElementById('stockMsg').textContent='';
+  setTimeout(function(){document.getElementById('stockQuantity').focus()},50);
+}
+function closeStockModal(){document.getElementById('stockModal').classList.add('hidden')}
+async function saveStockMovement(e){
+  e.preventDefault();
+  const quantity=Number(document.getElementById('stockQuantity').value);
+  const note=document.getElementById('stockNote').value.trim();
+  const msg=document.getElementById('stockMsg');
+  msg.textContent='';
+  if(!Number.isInteger(quantity)||quantity===0){msg.textContent='Introduce una cantidad entera distinta de 0.';return}
+  try{
+    await req('/admin/inventory/movements',{method:'POST',body:JSON.stringify({quantity_delta:quantity,notes:note})});
+    closeStockModal();
+    await loadAnalytics();
+  }catch(ex){msg.textContent=ex.message}
 }
 
 function openCreateCommercial(){
