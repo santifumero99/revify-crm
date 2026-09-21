@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="/static/admin.css?v=20260921-1855">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-1915">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -58,6 +58,7 @@
           <article><span>Ventas</span><b id="kSales">0</b><small id="kAvgTicket">Ticket medio 0 €</small></article>
           <article><span>Facturación</span><b id="kRevenue">0 €</b><small id="kUnits">0 NFC vendidos</small></article>
           <article><span>Conversión cartera</span><b id="kPortfolioConversion">0%</b><small>Vendidos / deals totales</small></article>
+          <article id="stockKpi" class="stock-kpi"><span>Stock disponible</span><b id="kStock">0</b><small id="kStockDetail">0 añadidas · 0 vendidas</small><button class="stock-action" onclick="openStockModal()">＋ Añadir stock</button></article>
         </div>
 
         <div class="two-col">
@@ -171,6 +172,21 @@
     </main>
   </div>
 
+  <div id="stockModal" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-head"><div><h2>Actualizar stock</h2><p>Registra entradas o ajustes de tarjetas NFC.</p></div><button onclick="closeStockModal()">✕</button></div>
+      <form onsubmit="saveStockMovement(event)" class="stack">
+        <label>Cantidad</label>
+        <input id="stockQuantity" type="number" min="-100000" max="100000" step="1" placeholder="Ej. 500" required>
+        <small>Usa un número positivo para añadir stock. Si necesitas corregir una pérdida o rotura, puedes usar un número negativo.</small>
+        <label>Nota</label>
+        <input id="stockNote" maxlength="500" placeholder="Ej. Pedido proveedor · 500 uds.">
+        <button class="primary" type="submit">Guardar movimiento</button>
+        <div id="stockMsg" class="form-msg"></div>
+      </form>
+    </div>
+  </div>
+
   <div id="commercialModal" class="modal hidden">
     <div class="modal-card">
       <div class="modal-head"><div><h2>Nuevo comercial</h2><p>Crea sus credenciales de acceso al CRM.</p></div><button onclick="closeCreateCommercial()">✕</button></div>
@@ -185,6 +201,6 @@
     </div>
   </div>
 
-  <script src="/static/admin.js?v=20260921-1855"></script>
+  <script src="/static/admin.js?v=20260921-1915"></script>
 </body>
 </html>
