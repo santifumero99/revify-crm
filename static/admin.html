@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="/static/admin.css?v=20260921-1840">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-1855">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -28,7 +28,6 @@
         <button class="nav" data-tab="categories" onclick="showTab('categories')">◇ Categorías</button>
         <button class="nav" data-tab="team" onclick="showTab('team')">◎ Comerciales</button>
         <button class="nav" data-tab="leads" onclick="showTab('leads')">▣ Negocios</button>
-        <button class="nav" data-tab="activity" onclick="showTab('activity')">↻ Actividad</button>
         <button class="nav" data-tab="security" onclick="showTab('security')">⚙ Seguridad</button>
       </nav>
       <div class="side-bottom"><small id="adminIdentity"></small><button onclick="adminLogout()">Cerrar sesión</button></div>
@@ -104,7 +103,7 @@
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento por zona postal</h2><p>CP, barrio/zona asociada, actividad, conversión y facturación.</p></div><input id="postalSearch" class="small-search" placeholder="Buscar CP o barrio..." oninput="renderPostalTable()"></div>
           <div class="postal-note">Un código postal puede abarcar más de un barrio. Revify muestra las zonas asociadas al CP y evita presentar una precisión falsa.</div>
-          <div class="table-wrap"><table class="wide"><thead><tr><th>CP</th><th>Barrio / zona asociada</th><th>Negocios</th><th>Vendidos</th><th>Visitas</th><th>Demos</th><th>Seguim.</th><th>Ventas</th><th>Unidades</th><th>Conv.</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / lead</th><th>Facturación</th></tr></thead><tbody id="postalTable"></tbody></table></div>
+          <div class="table-wrap"><table class="wide"><thead><tr><th>CP</th><th>Barrio / zona asociada</th><th>Deals</th><th>Vendidos</th><th>Visitas</th><th>Ventas</th><th>Unidades</th><th>Conversión</th><th>Venta/visita</th><th>Ticket medio</th><th>€ / deal</th><th>Facturación</th></tr></thead><tbody id="postalTable"></tbody></table></div>
         </section>
       </section>
 
@@ -145,15 +144,8 @@
               <option value="">Todas las categorías</option><option>Restauración / Hostelería</option><option>Comercio / Retail</option><option>Belleza / Estética</option><option>Salud / Bienestar</option><option>Hogar / Reformas</option><option>Automoción / Movilidad</option><option>Servicios profesionales</option><option>Educación / Formación</option><option>Ocio / Turismo / Alojamiento</option><option>Otros servicios</option>
             </select>
           </div>
-          <div class="table-wrap"><table class="ultra-wide"><thead><tr><th>Negocio</th><th>CP</th><th>Barrio / zona</th><th>Categoría / tipo</th><th>Comercial</th><th>Estado</th><th>Visitas</th><th>Demos</th><th>Ventas</th><th>Unidades</th><th>Ticket</th><th>Facturación</th><th>Contacto</th><th>Próxima acción</th><th>Actualizado</th></tr></thead><tbody id="businessTable"></tbody></table></div>
+          <div class="table-wrap"><table class="ultra-wide"><thead><tr><th>Negocio</th><th>CP</th><th>Barrio / zona</th><th>Categoría / tipo</th><th>Comercial</th><th>Estado</th><th>Visitas</th><th>Ventas</th><th>Unidades</th><th>Ticket</th><th>Facturación</th><th>Contacto</th><th>Próxima acción</th><th>Actualizado</th></tr></thead><tbody id="businessTable"></tbody></table></div>
           <button id="adminLoadMore" class="load-more hidden" onclick="loadAdminLeads(false)">Cargar 50 más</button>
-        </section>
-      </section>
-
-      <section id="tab-activity" class="tab hidden">
-        <section class="panel">
-          <div class="panel-head"><div><h2>Última actividad</h2><p>Rastro de cambios generado por el equipo.</p></div></div>
-          <div id="activityFeed" class="activity-feed"></div>
         </section>
       </section>
 
@@ -193,6 +185,6 @@
     </div>
   </div>
 
-  <script src="/static/admin.js?v=20260921-1840"></script>
+  <script src="/static/admin.js?v=20260921-1855"></script>
 </body>
 </html>
