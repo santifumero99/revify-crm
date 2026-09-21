@@ -212,23 +212,88 @@ def patch_lead(lead_id:int,data:LeadPatch,user:User=Depends(current_user),db:Ses
     x=db.get(Lead,lead_id)
     if not x or x.assigned_user_id!=user.id:
         raise HTTPException(404,'Lead no encontrado')
-    before=x.status
+
+    before={
+        'name':x.name,'address':x.address or '','postal_code':x.postal_code,
+        'business_type':x.business_type,'business_subtype':x.business_subtype or '',
+        'owner_name':x.owner_name or '','phone':x.phone or '','status':x.status,
+        'next_action':x.next_action or ''
+    }
+    existing_sale=db.scalar(select(Sale).where(Sale.lead_id==x.id,Sale.actor_user_id==user.id).order_by(Sale.created_at.desc()).limit(1))
+
+    if data.name is not None:
+        x.name=data.name.strip()
+    if data.address is not None:
+        x.address=data.address.strip() or None
+    if data.postal_code is not None:
+        x.postal_code=data.postal_code
+    if data.business_type is not None:
+        x.business_type=data.business_type.strip()
+    if data.business_subtype is not None:
+        x.business_subtype=data.business_subtype.strip() or None
+    if data.owner_name is not None:
+        x.owner_name=data.owner_name.strip() or None
+    if data.phone is not None:
+        x.phone=data.phone.strip() or None
+
+    sale_created=None
     if data.status is not None:
         if data.status not in VALID_STATUSES:
             raise HTTPException(400,'Estado no válido')
-        existing_sale=db.scalar(select(Sale.id).where(Sale.lead_id==x.id,Sale.actor_user_id==user.id).limit(1))
+        if x.status=='won' and data.status!='won' and existing_sale:
+            raise HTTPException(400,'Este deal ya tiene una venta. Corrige la venta desde Ventas')
+
         if data.status=='won' and not existing_sale:
-            raise HTTPException(400,'Para marcarlo como vendido, registra la venta desde Alta')
-        if before=='won' and data.status!='won' and existing_sale:
-            raise HTTPException(400,'Este deal tiene una venta. Corrígela desde Ventas')
+            if data.sale_quantity is None or data.sale_unit_price is None or not data.sale_payment_method:
+                raise HTTPException(400,'Completa los datos de la venta para marcarlo como vendido')
+            if data.sale_payment_method not in VALID_PAYMENT_METHODS:
+                raise HTTPException(400,'Método de pago no válido')
+            total=Decimal(data.sale_quantity)*data.sale_unit_price
+            sale_created=Sale(
+                lead_id=x.id,
+                actor_user_id=user.id,
+                quantity=data.sale_quantity,
+                unit_price=data.sale_unit_price,
+                total=total,
+                payment_method=data.sale_payment_method,
+                delivered=True if data.sale_delivered is None else data.sale_delivered
+            )
+            db.add(sale_created)
+            db.flush()
+            audit(db,user.id,'sale_created',x.id,{'sale_id':sale_created.id,'quantity':sale_created.quantity,'total':str(total),'source':'deal_update'})
+            existing_sale=sale_created
+
         x.status=data.status
+        if x.status=='won':
+            x.next_action='Venta registrada'
+        elif x.status=='lost':
+            x.next_action='Sin venta'
+        elif x.status=='follow_up':
+            x.next_action='Seguimiento pendiente'
+        elif x.status=='owner_absent':
+            x.next_action='Volver cuando esté el dueño'
+        elif x.status=='closed':
+            x.next_action='Volver a visitar'
+        else:
+            x.next_action='Pendiente de visita'
+
     if data.next_action is not None:
-        x.next_action=data.next_action
+        x.next_action=data.next_action.strip()
+
     x.updated_at=utcnow()
-    audit(db,user.id,'lead_updated',x.id,{'status_before':before,'status_after':x.status})
+    after={
+        'name':x.name,'address':x.address or '','postal_code':x.postal_code,
+        'business_type':x.business_type,'business_subtype':x.business_subtype or '',
+        'owner_name':x.owner_name or '','phone':x.phone or '','status':x.status,
+        'next_action':x.next_action or ''
+    }
+    audit(db,user.id,'lead_updated',x.id,{'before':before,'after':after})
     db.commit()
     db.refresh(x)
-    return lead_out(x)
+    response=lead_out(x)
+    if sale_created:
+        response['sale']=sale_out(sale_created,x)
+    return response
 
 @app.post('/api/leads/{lead_id}/activities')
 def add_activity(lead_id:int,data:ActivityCreate,user:User=Depends(current_user),db:Session=Depends(get_db)):
