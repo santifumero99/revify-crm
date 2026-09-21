@@ -59,13 +59,16 @@ async function adminLogin(e){
     if(!login.ok)throw new Error(data.detail||'Email o contraseña incorrectos');
     token=data.access_token;localStorage.setItem('revify_token',token);
     const me=await req('/admin/me');document.getElementById('adminIdentity').textContent=me.email;
-    showAdmin();await loadEverything();
+    showAdmin();
+    try{await loadEverything()}catch(loadErr){console.error(loadErr);alert('Has iniciado sesión, pero no se pudo cargar una parte del Dashboard. Recarga la página si persiste.')}
   }catch(ex){err.textContent=ex.message;localStorage.removeItem('revify_token');token=''}
 }
 async function boot(){
   if(!token){showLogin();return}
-  try{const me=await req('/admin/me');document.getElementById('adminIdentity').textContent=me.email;showAdmin();await loadEverything()}
-  catch(ex){showLogin()}
+  try{
+    const me=await req('/admin/me');document.getElementById('adminIdentity').textContent=me.email;showAdmin();
+  }catch(ex){showLogin();return}
+  try{await loadEverything()}catch(loadErr){console.error(loadErr)}
 }
 
 function showTab(name){
