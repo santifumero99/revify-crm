@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Revify Admin</title>
-  <link rel="stylesheet" href="/static/admin.css?v=20260921-2015">
+  <link rel="stylesheet" href="/static/admin.css?v=20260921-2130">
 </head>
 <body>
   <div id="loginView" class="login-shell">
@@ -38,6 +38,7 @@
       <header>
         <div><h1 id="pageTitle">Dashboard</h1><p id="pageSubtitle">Visión global de Revify</p></div>
         <div class="header-actions">
+          <select id="globalRep" onchange="loadAnalytics()"><option value="">Todo el equipo</option></select>
           <select id="postalSegment" onchange="loadAnalytics()"><option value="">Todos los CP</option></select>
           <select id="periodSelect" onchange="loadAnalytics()">
             <option value="1">Hoy</option>
@@ -73,6 +74,29 @@
           <div id="attentionList" class="attention-list"></div>
         </section>
 
+        <section class="panel intelligence-panel">
+          <div class="panel-head"><div><h2>Inteligencia comercial</h2><p>Lecturas automáticas construidas únicamente con la actividad real del CRM.</p></div><span class="smart-badge">Revify Intelligence</span></div>
+          <div id="smartInsights" class="insight-grid"></div>
+        </section>
+
+        <div class="two-col health-grid">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Salud del pipeline</h2><p>Antigüedad de los deals que siguen abiertos.</p></div><b id="avgOpenAge">0 días</b></div>
+            <div id="pipelineAging" class="aging-list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Calidad comercial</h2><p>Conversión real, velocidad de cierre y disciplina de seguimiento.</p></div></div>
+            <div class="quality-grid">
+              <article><span>Win rate decidido</span><b id="qWinRate">0%</b><small>Ganados / ganados + perdidos</small></article>
+              <article><span>Días hasta venta</span><b id="qDaysToSale">0</b><small>Media del periodo</small></article>
+              <article><span>Seguimientos programados</span><b id="qFollowScheduled">0%</b><small>Follow-ups con fecha/hora</small></article>
+              <article><span>Follow-ups vencidos</span><b id="qFollowOverdue">0%</b><small>Sobre los programados</small></article>
+              <article><span>Cobertura Barcelona</span><b id="qCoverage">0%</b><small id="qCoverageCount">0 / 42 CP</small></article>
+              <article><span>Facturación / visita</span><b id="qRevenueVisit">0 €</b><small>Eficiencia de calle</small></article>
+            </div>
+          </section>
+        </div>
+
         <div class="two-col">
           <section class="panel">
             <div class="panel-head"><div><h2>Embudo actual</h2><p>Distribución de todos los negocios por estado</p></div></div>
@@ -102,6 +126,17 @@
       </section>
 
       <section id="tab-postal" class="tab hidden">
+        <div class="two-col">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Cobertura territorial</h2><p>Qué parte del mapa postal de Barcelona ya tiene actividad registrada.</p></div><b id="postalCoveragePct">0%</b></div>
+            <div class="coverage-meter"><i id="postalCoverageBar" style="width:0%"></i></div>
+            <small id="postalCoverageText" class="coverage-copy">0 de 42 códigos postales con deals.</small>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><div><h2>Zonas sin trabajar</h2><p>CP de Barcelona sin ningún deal registrado todavía.</p></div></div>
+            <div id="whitespaceList" class="whitespace-list"></div>
+          </section>
+        </div>
         <section class="panel">
           <div class="panel-head"><div><h2>Rendimiento por zona postal</h2><p>CP, barrio/zona asociada, actividad, conversión y facturación.</p></div><input id="postalSearch" class="small-search" placeholder="Buscar CP o barrio..." oninput="renderPostalTable()"></div>
           <div class="postal-note">Un código postal puede abarcar más de un barrio. Revify muestra las zonas asociadas al CP y evita presentar una precisión falsa.</div>
@@ -134,7 +169,7 @@
 
       <section id="tab-leads" class="tab hidden">
         <section class="panel">
-          <div class="panel-head"><div><h2>Detalle de todos los negocios</h2><p id="leadCountLabel">Cartera completa del equipo.</p></div></div>
+          <div class="panel-head"><div><h2>Detalle de todos los negocios</h2><p id="leadCountLabel">Cartera completa del equipo.</p></div><div class="panel-actions"><button class="link" onclick="clearLeadFilters()">Limpiar filtros</button><button class="primary small" onclick="exportVisibleBusinesses()">Exportar CSV</button></div></div>
           <div class="filters">
             <input id="fSearch" placeholder="Buscar negocio, dirección, contacto..." oninput="debouncedAdminLeads()">
             <div class="postal-filter"><input id="fPostal" maxlength="5" placeholder="Código postal" oninput="updatePostalHint();debouncedAdminLeads()"><small id="fPostalHint">Escribe un CP para ver su barrio/zona.</small></div>
@@ -194,6 +229,6 @@
     </div>
   </div>
 
-  <script src="/static/admin.js?v=20260921-2015"></script>
+  <script src="/static/admin.js?v=20260921-2130"></script>
 </body>
 </html>
