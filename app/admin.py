@@ -131,26 +131,52 @@ def admin_me(admin: User = Depends(require_admin)):
 @router.get("/api/admin/analytics")
 def admin_analytics(
     days: int = Query(30, ge=0, le=3650),
+    postal_code: str = "",
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     start = _period_start(days)
-    lead_count = db.scalar(select(func.count()).select_from(Lead)) or 0
-    won_leads = db.scalar(select(func.count()).select_from(Lead).where(Lead.status == "won")) or 0
+    postal_code = postal_code.strip()
+    postal_cond = Lead.postal_code == postal_code if postal_code else None
+
+    all_postal_codes = list(db.scalars(
+        select(Lead.postal_code)
+        .where(Lead.postal_code.is_not(None), Lead.postal_code != "")
+        .distinct()
+        .order_by(Lead.postal_code.asc())
+    ).all())
+
+    lead_count_q = select(func.count()).select_from(Lead)
+    won_q = select(func.count()).select_from(Lead).where(Lead.status == "won")
+    if postal_cond is not None:
+        lead_count_q = lead_count_q.where(postal_cond)
+        won_q = won_q.where(postal_cond)
+    lead_count = db.scalar(lead_count_q) or 0
+    won_leads = db.scalar(won_q) or 0
     active_users = db.scalar(select(func.count()).select_from(User).where(User.is_active == True)) or 0
 
     lead_period_q = select(func.count()).select_from(Lead)
-    activity_period_q = select(
-        func.count(Activity.id),
-        func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
-        func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
-        func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+    activity_period_q = (
+        select(
+            func.count(Activity.id),
+            func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+            func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
+            func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+        )
+        .select_from(Activity)
     )
-    sales_period_q = select(
-        func.count(Sale.id),
-        func.coalesce(func.sum(Sale.quantity), 0),
-        func.coalesce(func.sum(Sale.total), 0),
+    sales_period_q = (
+        select(
+            func.count(Sale.id),
+            func.coalesce(func.sum(Sale.quantity), 0),
+            func.coalesce(func.sum(Sale.total), 0),
+        )
+        .select_from(Sale)
     )
+    if postal_cond is not None:
+        lead_period_q = lead_period_q.where(postal_cond)
+        activity_period_q = activity_period_q.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
+        sales_period_q = sales_period_q.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
     if start:
         lead_period_q = lead_period_q.where(Lead.created_at >= start)
         activity_period_q = activity_period_q.where(Activity.created_at >= start)
@@ -167,11 +193,10 @@ def admin_analytics(
     units = int(sales_total[1] or 0)
     revenue = float(sales_total[2] or 0)
 
-    status_rows = db.execute(
-        select(Lead.status, func.count(Lead.id))
-        .group_by(Lead.status)
-        .order_by(func.count(Lead.id).desc())
-    ).all()
+    status_q = select(Lead.status, func.count(Lead.id)).group_by(Lead.status).order_by(func.count(Lead.id).desc())
+    if postal_cond is not None:
+        status_q = status_q.where(postal_cond)
+    status_rows = db.execute(status_q).all()
     statuses = [{
         "status": status,
         "label": STATUS_LABELS.get(status, status),
@@ -180,15 +205,14 @@ def admin_analytics(
     } for status, count in status_rows]
 
     def breakdown(dim, key_name):
-        base_rows = db.execute(
+        base_q = (
             select(
                 dim,
                 func.count(Lead.id),
                 func.sum(case((Lead.status == "won", 1), else_=0)),
             )
-            .group_by(dim)
-        ).all()
-
+            .select_from(Lead)
+        )
         aq = (
             select(
                 dim,
@@ -209,9 +233,14 @@ def admin_analytics(
             .select_from(Sale)
             .join(Lead, Lead.id == Sale.lead_id)
         )
+        if postal_cond is not None:
+            base_q = base_q.where(postal_cond)
+            aq = aq.where(postal_cond)
+            sq = sq.where(postal_cond)
         if start:
             aq = aq.where(Activity.created_at >= start)
             sq = sq.where(Sale.created_at >= start)
+        base_rows = db.execute(base_q.group_by(dim)).all()
         activity_rows = db.execute(aq.group_by(dim)).all()
         sale_rows = db.execute(sq.group_by(dim)).all()
         return _merge_breakdown(base_rows, activity_rows, sale_rows, key_name)
@@ -222,25 +251,42 @@ def admin_analytics(
     users = list(db.scalars(select(User).order_by(User.created_at.asc())).all())
     reps = []
     for u in users:
-        leads = db.scalar(select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id)) or 0
-        won = db.scalar(select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id, Lead.status == "won")) or 0
-        aq = select(
-            func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
-            func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
-            func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
-        ).where(Activity.actor_user_id == u.id)
-        sq = select(
-            func.count(Sale.id),
-            func.coalesce(func.sum(Sale.quantity), 0),
-            func.coalesce(func.sum(Sale.total), 0),
-        ).where(Sale.actor_user_id == u.id)
+        leads_q = select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id)
+        won_rep_q = select(func.count()).select_from(Lead).where(Lead.assigned_user_id == u.id, Lead.status == "won")
+        aq = (
+            select(
+                func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
+                func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
+                func.sum(case((Activity.activity_type == "follow_up", 1), else_=0)),
+            )
+            .select_from(Activity)
+            .where(Activity.actor_user_id == u.id)
+        )
+        sq = (
+            select(
+                func.count(Sale.id),
+                func.coalesce(func.sum(Sale.quantity), 0),
+                func.coalesce(func.sum(Sale.total), 0),
+            )
+            .select_from(Sale)
+            .where(Sale.actor_user_id == u.id)
+        )
+        if postal_cond is not None:
+            leads_q = leads_q.where(postal_cond)
+            won_rep_q = won_rep_q.where(postal_cond)
+            aq = aq.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
+            sq = sq.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
         if start:
             aq = aq.where(Activity.created_at >= start)
             sq = sq.where(Sale.created_at >= start)
+
+        leads = db.scalar(leads_q) or 0
+        won = db.scalar(won_rep_q) or 0
         ar = db.execute(aq).one()
         sr = db.execute(sq).one()
         rep_sales = int(sr[0] or 0)
         rep_revenue = float(sr[2] or 0)
+        rep_visits = int(ar[0] or 0)
         is_admin = u.role == "admin" or u.email.lower() == ADMIN_EMAIL
         reps.append({
             "id": u.id,
@@ -249,42 +295,49 @@ def admin_analytics(
             "is_active": u.is_active,
             "leads": int(leads),
             "won": int(won),
-            "visits": int(ar[0] or 0),
+            "visits": rep_visits,
             "demos": int(ar[1] or 0),
             "followups": int(ar[2] or 0),
             "sales": rep_sales,
             "units": int(sr[1] or 0),
             "revenue": rep_revenue,
             "conversion_pct": round((won / leads * 100), 1) if leads else 0,
-            "sale_per_visit_pct": round((rep_sales / int(ar[0] or 0) * 100), 1) if int(ar[0] or 0) else 0,
+            "sale_per_visit_pct": round((rep_sales / rep_visits * 100), 1) if rep_visits else 0,
             "avg_ticket": round((rep_revenue / rep_sales), 2) if rep_sales else 0,
         })
 
     trend_days = 30 if days == 0 else min(max(days, 1), 90)
     trend_start = utcnow() - timedelta(days=trend_days - 1)
-    lead_daily = db.execute(
+    lead_daily_q = (
         select(func.date(Lead.created_at), func.count(Lead.id))
         .where(Lead.created_at >= trend_start)
-        .group_by(func.date(Lead.created_at))
-    ).all()
-    activity_daily = db.execute(
+    )
+    activity_daily_q = (
         select(
             func.date(Activity.created_at),
             func.sum(case((Activity.activity_type == "visit", 1), else_=0)),
             func.sum(case((Activity.activity_type == "demo", 1), else_=0)),
         )
+        .select_from(Activity)
         .where(Activity.created_at >= trend_start)
-        .group_by(func.date(Activity.created_at))
-    ).all()
-    sales_daily = db.execute(
+    )
+    sales_daily_q = (
         select(
             func.date(Sale.created_at),
             func.count(Sale.id),
             func.coalesce(func.sum(Sale.total), 0),
         )
+        .select_from(Sale)
         .where(Sale.created_at >= trend_start)
-        .group_by(func.date(Sale.created_at))
-    ).all()
+    )
+    if postal_cond is not None:
+        lead_daily_q = lead_daily_q.where(postal_cond)
+        activity_daily_q = activity_daily_q.join(Lead, Lead.id == Activity.lead_id).where(postal_cond)
+        sales_daily_q = sales_daily_q.join(Lead, Lead.id == Sale.lead_id).where(postal_cond)
+
+    lead_daily = db.execute(lead_daily_q.group_by(func.date(Lead.created_at))).all()
+    activity_daily = db.execute(activity_daily_q.group_by(func.date(Activity.created_at))).all()
+    sales_daily = db.execute(sales_daily_q.group_by(func.date(Sale.created_at))).all()
     daily = {}
     for i in range(trend_days):
         d = (trend_start + timedelta(days=i)).date().isoformat()
@@ -298,13 +351,14 @@ def admin_analytics(
         daily[str(d)]["sales"] = int(s or 0)
         daily[str(d)]["revenue"] = float(rev or 0)
 
-    recent_rows = db.execute(
+    recent_q = (
         select(AuditLog, User.email, Lead.name)
         .join(User, User.id == AuditLog.actor_user_id)
         .outerjoin(Lead, Lead.id == AuditLog.lead_id)
-        .order_by(AuditLog.created_at.desc())
-        .limit(50)
-    ).all()
+    )
+    if postal_cond is not None:
+        recent_q = recent_q.where(postal_cond)
+    recent_rows = db.execute(recent_q.order_by(AuditLog.created_at.desc()).limit(50)).all()
     recent = [{
         "event_type": log.event_type,
         "created_at": log.created_at.isoformat(),
@@ -314,6 +368,8 @@ def admin_analytics(
 
     return {
         "period": {"days": days, "start": start.isoformat() if start else None},
+        "segment": {"postal_code": postal_code or None},
+        "available_postal_codes": all_postal_codes,
         "summary": {
             "active_users": int(active_users),
             "leads_total": int(lead_count),
@@ -330,6 +386,7 @@ def admin_analytics(
             "avg_ticket": round((revenue / sales), 2) if sales else 0,
             "sale_per_visit_pct": round((sales / visits * 100), 1) if visits else 0,
             "revenue_per_visit": round((revenue / visits), 2) if visits else 0,
+            "revenue_per_lead": round((revenue / lead_count), 2) if lead_count else 0,
         },
         "statuses": statuses,
         "postal_codes": postal_codes,
