@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>Revify CRM</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <title>Revify CRM · Comercial</title>
+  <link rel="stylesheet" href="/static/style.css?v=20260921-1715">
 </head>
 <body>
   <div class="phone">
@@ -109,26 +109,26 @@
             <div class="create-field"><label>CONTACTO / DUEÑO</label><input id="newOwner" placeholder="Nombre"></div>
             <div class="create-field"><label>TELÉFONO</label><input id="newPhone" inputmode="tel" placeholder="600 000 000"></div>
             <div class="create-field full">
-              <label>ESTADO / RESULTADO DEL DEAL *</label>
+              <label>RESULTADO DEL DEAL *</label>
               <select id="newStatus" onchange="toggleCreateSaleFields()">
-                <option value="pending">Pendiente</option>
+                <option value="pending">Pendiente / en curso</option>
                 <option value="owner_absent">No está el dueño</option>
                 <option value="closed">Local cerrado</option>
                 <option value="follow_up">Seguimiento</option>
                 <option value="lost">No vendido</option>
-                <option value="won">Vendido</option>
+                <option value="won">✅ Vendido — registrar venta</option>
               </select>
             </div>
 
             <div class="create-field full" id="createSaleFields" style="display:none">
               <div style="border:1px solid #dfe7f1;border-radius:12px;padding:9px;background:#f8fbff">
-                <div style="font-size:9px;font-weight:900;color:#17365f;margin-bottom:8px">DATOS DE LA VENTA</div>
+                <div style="font-size:11px;font-weight:900;color:#17365f;margin-bottom:3px">VENTA</div><div style="font-size:9px;color:#64748b;margin-bottom:10px">Se guardará junto con el deal y aparecerá automáticamente en Ventas.</div>
                 <div class="create-grid">
                   <div class="create-field"><label>UNIDADES NFC</label><input id="newSaleQuantity" type="number" min="1" max="1000" value="1" oninput="calcCreateSaleTotal()"></div>
                   <div class="create-field"><label>PRECIO UNITARIO (€)</label><input id="newSaleUnitPrice" type="number" min="0.01" step="0.01" value="25.00" oninput="calcCreateSaleTotal()"></div>
                   <div class="create-field"><label>COBRADO CON</label><select id="newPaymentMethod">
+                    <option value="card" selected>Tarjeta</option>
                     <option value="cash">Efectivo</option>
-                    <option value="card">Tarjeta</option>
                     <option value="bizum">Bizum</option>
                     <option value="transfer">Transferencia</option>
                     <option value="other">Otro</option>
@@ -163,7 +163,7 @@
     <section class="screen" id="screen-sale">
       <main class="subscreen">
         <div class="page-head">
-          <div><h2>Ventas</h2><p>Resumen e histórico de lo que ya has vendido</p></div>
+          <div><h2>Ventas</h2><p>Solo ventas cerradas · se crean desde Alta</p></div>
         </div>
         <div class="lead-summary">
           <div class="sum"><span>Ventas</span><b id="salesCount">0</b></div>
@@ -195,6 +195,6 @@
     </nav>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260921-1715"></script>
 </body>
 </html>
